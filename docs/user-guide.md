@@ -1,4 +1,4 @@
-# Maravian CheckList User Guide
+# Maravian Checklist User Guide
 
 ## Video Guide
 
@@ -8,21 +8,21 @@ For a visual walkthrough of the Maravian CheckList features and functionality, h
 
 ## Features
 
-- Team-based task management with password protection
+- Checklist-based task management with password protection
 - Real-time task completion tracking
 - Nested subtasks
 - Daily task completion records and checkout system
-- Team member check-in/checkout system with notes and ratings
-- Password-protected team access with admin controls
-- Task assignment to specific team members
+- Group member check-in/checkout system with notes and ratings
+- Password-protected checklist access with admin controls
+- Task assignment to specific group members
 - Task reordering and organization
-- Team statistics and activity History
-- Team cloning functionality
-- Private team options
+- Group statistics and activity History
+- Checklist cloning functionality
+- Private checklist options
 
 ## Introduction
 
-Welcome to Maravian CheckList! This task management system is designed for teams who need to track regular specified tasks or coordinate events with multiple members. Whether you're managing Sunday media teams, ushering duties, event planning, or personal daily routines, Maravian CheckList helps you stay organized and coordinated.
+Welcome to Maravian Checklist! This task management system is designed for groups and individuals who need to track regular specified tasks or coordinate events with multiple members. Whether you're managing Sunday media groups, ushering duties, event planning, or personal daily routines, Checklist helps you stay organized and coordinated.
 
 ## Getting Started
 
@@ -33,34 +33,58 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 3. **Forgot Password**: Reset your password via email if needed
 4. **Account Management**: View and update your account details at any time
 
-### Teams
+### Checklists
 
-#### Creating a Team
+#### Creating a Checklist
 
-1. Click the "Create Team" button on the home page
-2. Enter your team name
-3. Set a team password
-4. Choose whether to make the team private (hidden from public lists)
-5. Choose whether to allow team cloning by members
-6. Share the team name and password with your team members
-7. As creator, you will be the team admin, you can make other members admin as well
+1. Click the "Create Checklist" button on the home page
+2. Enter your checklist name
+3. Set a checklist password
+4. Choose whether to make the checklist private (hidden from public lists)
+5. Choose whether to allow checklist cloning by members
+6. Share the checklist name and password with your members (if it's for group use)
+7. As creator, you will be the checklist admin, you can make other members admin as well if needed
+8. You can use checklists for individual task management or for collaborative group tasks
 
-#### Joining a Team
+#### Joining a Checklist
 
-1. Find your team in the teams list on the home page
-2. Enter the team password
-3. Click "Join Team"
-4. You'll be redirected to your team's task board
-5. Teams you've joined will appear in your "Joined Teams" list
+1. Find your checklist in the checklists list on the home page
+2. Enter the checklist password
+3. Click "Join Checklist"
+4. You'll be redirected to your checklist's task board
+5. Checklists you've joined will appear in your "My Checklists" list
 
 ## Managing Tasks
+
+### Task Types
+
+#### Recurring Tasks
+
+Recurring tasks are daily activities that happen frequently and need to be tracked separately for each day. These tasks:
+
+- Are tracked for specific dates
+- Need to be completed each day they occur
+- Show completion status for the selected date
+- Record who completed them and at what time
+- Are ideal for daily responsibilities or routine activities
+
+#### LongTerm Tasks
+
+LongTerm tasks represent ongoing responsibilities or one-time activities that persist over time. These tasks:
+
+- Are completed once and remain checked off regardless of date
+- Don't need to be completed daily
+- Record who completed them and at what time
+- Are ideal for project milestones, one-time setup activities, or persistent responsibilities
+- Can be organized hierarchically with subtasks
+- Can be assigned to specific group members
 
 ### Task Organization
 
 - Tasks can be organized hierarchically with parent tasks and subtasks
 - Tasks maintain their order and can be reordered as needed
 - Each task can be marked as complete/incomplete for each day
-- Tasks can be assigned to specific team members
+- Tasks can be assigned to specific group members
 - You can filter to see only tasks assigned to you
 
 ### Creating Tasks (Admin Only)
@@ -76,12 +100,12 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 - Delete tasks using the delete (trash) icon
 - Add subtasks using the plus icon
 - Reorder tasks using the up/down arrows
-- Assign tasks to specific team members
+- Assign tasks to specific group members
 
 ### Task Assignment
 
 1. As an admin, click the assignment icon next to a task or use the dropdown menu and select "Manage Assignments"
-2. Select team members to assign to the task
+2. Select group members to assign to the task
 3. Save the assignments
 4. Assigned members will see their assigned tasks highlighted
 5. Users can filter to view only tasks assigned to them
@@ -95,18 +119,34 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 4. View who completed each task and when
 5. You must be checked in to complete tasks
 
+### Managing Tasks
+
+Tasks are accessible through the "Recurring" / "LongTerm" tab in your team's page:
+
+1. **Viewing Checklist Tasks**: Navigate to the between the tab to see all tasks for your team
+2. **Creating Checklist Tasks**: (Admin only) Click the "Add Item" button, enter a task title, and save
+3. **Creating Subtasks**: Click the plus icon next to any task to add a nested subtask
+4. **Task Hierarchy**: Organize tasks with multiple levels of subtasks for complex projects
+5. **Task Assignments**: Assign tasks to specific group members using the assignment feature
+6. **Completing Tasks**: Check the checkbox to mark a task as complete
+   - Task stays completed regardless of date
+   - The system records who completed it and when
+   - All group members can see completion status
+7. **User Filtering**: Click the "Users" button to filter tasks by group member
+8. **Refreshing Data**: Use the "Refresh" button to see the latest updates from group members
+
 ### Task Views
 
 - Expand/collapse task groups using the chevron icons
 - View task completion status for any selected date
-- See real-time updates when other team members complete tasks
+- See real-time updates when other group members complete tasks
 - Filter to view tasks assigned to you
 
 ## Team Coordination
 
 ### Check-in System
 
-- Team members can check in when they arrive
+- Group members can check in when they arrive
 - Add notes with your check-in
 - View who is currently checked in
 - Track attendance and participation
@@ -119,39 +159,40 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 4. Submit your checkout
 5. View checkout history with notes and ratings
 
-### Team Members
+### Checklist Members
 
-- View all team members using the "Team Members" button
+- View all members using the "Members" button
 - See member roles (Admin/Member)
 - Check who is currently active
 - Admins can ban problematic members
 
-### Team Visibility & Privacy
+### Checklist Visibility & Privacy
 
-- Teams can be set as private or public when creating them
-- Private teams are hidden from the main teams list on the home page
-- Private teams can only be joined with a direct link or by knowing the team name
-- Team admins can change privacy settings from the team settings page
+- Checklist can be set as private or public when creating them
+- Private Checklist are hidden from the list on the home page for unjoined members
+- Private Checklist can only be joined with a direct link or by knowing the Checklist name
+- Checklist admins can change privacy settings from the settings page
 
-### Team Cloning
+### Checklist Cloning
 
-1. Team owners can enable or disable team cloning in team settings
-2. When enabled, any team member can create a copy of the team
-3. To clone a team, click the "Make own copy of this team" button on the team page
-4. Enter a new team name and password for your cloned team
-5. Choose whether to make your cloned team private
-6. All tasks and subtasks from the original team are copied to your new team
-7. You become the admin of your cloned team
-8. Cloned teams have cloning disabled by default (you can enable it in settings)
+1. Checklist owners can enable or disable Checklist cloning in Checklist settings
+2. When enabled, any member can create a copy of the Checklist
+3. To clone a Checklist, click the "Make own copy of this Checklist" button on the Checklist page
+4. Enter a new Checklist name and password for your cloned group
+5. Choose whether to make your cloned Checklist private
+6. All tasks and subtasks from the original Checklist are copied to your new Checklist
+7. You become the admin of your cloned Checklist
+8. Cloned Checklist have cloning disabled by default (you can enable it in settings)
 
 ## Admin Features
 
-### Team Management
+### Group Management
 
-- Create and delete teams
-- Set and update team passwords
-- Ban team members if necessary
-- View all team activity
+- Create and delete groups
+- Set and update group passwords
+- Ban group members if necessary
+- View all group activity
+- Make other users admin
 
 ### Task Management
 
@@ -174,15 +215,15 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 ### Statistics
 
 - View your activity statistics
-- Track your participation across teams
+- Track your participation across groups
 
 ## Tips for Different Use Cases
 
-### Regular Team Tasks (e.g., Sunday Service)
+### Regular Group Tasks (e.g., Sunday Service)
 
 - Create a standard task list that repeats
-- Assign tasks to specific team members
-- Team members check in upon arrival
+- Assign tasks to specific group members
+- Group members check in upon arrival
 - Mark tasks as they're completed
 - Check out when done with notes
 - Monitor progress in real-time
@@ -191,9 +232,20 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 
 - Create tasks for all event requirements
 - Organize tasks hierarchically by area
-- Assign tasks to specific team members
+- Assign tasks to specific group members
 - Track completion as preparations progress
-- Keep all team members updated on status
+- Keep all group members updated on status
+- Use Checklists for one-time setup activities or milestones
+- Use Recurring tasks for daily activities during the event
+
+### Project Management
+
+- Set up Checklists for project deliverables and milestones
+- Create a hierarchical structure with main objectives and subtasks
+- Assign responsibilities to group members
+- Track progress of each component over time
+- Use as a persistent checklist throughout the project lifecycle
+- Create a visual dashboard of overall project progress
 
 ### Personal Task Lists
 
@@ -201,6 +253,7 @@ Welcome to Maravian CheckList! This task management system is designed for teams
 - Track completion over time
 - Checkout with daily reflections
 - Maintain accountability
+- Use LongTerm for goals and one-time activities
 
 ## Need Help?
 

@@ -10,12 +10,40 @@ import { prisma } from "@/lib/prisma";
 export const serverGetTasks = async (args: {
   teamId: string;
   date: string;
+  type?: string;
+  userId?: string;
 }) => {
+  const whereClause: any = {
+    teamId: args.teamId,
+    isDeleted: false,
+  };
+
+  // Add type filter if specified
+  if (args.type) {
+    whereClause.type = args.type;
+  } else {
+    // Default to daily tasks
+    whereClause.type = "daily";
+  }
+
+  // For private checklists, filter by userId
+  if (args.type === "checklist" && args.userId) {
+    whereClause.OR = [
+      { visibility: "team" },
+      { visibility: "public" },
+      {
+        visibility: "private",
+        assignments: {
+          some: {
+            userId: args.userId,
+          },
+        },
+      },
+    ];
+  }
+
   return await prisma.task.findMany({
-    where: {
-      teamId: args.teamId,
-      isDeleted: false,
-    },
+    where: whereClause,
     include: {
       assignments: {
         select: {
@@ -178,6 +206,8 @@ export const tasksRouter = router({
         parentId: z.string().uuid().nullable(),
         teamId: z.string().uuid(),
         position: z.number().optional(),
+        type: z.enum(["daily", "checklist"]).default("daily"),
+        visibility: z.enum(["team", "private", "public"]).default("team"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -222,6 +252,8 @@ export const tasksRouter = router({
             parentId: input.parentId,
             teamId: input.teamId,
             position,
+            type: input.type,
+            visibility: input.visibility,
           },
         });
 
@@ -627,6 +659,73 @@ export const tasksRouter = router({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to update task assignments",
         });
+      }
+    }),
+
+  getChecklists: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        type: z.enum(["checklist"]).default("checklist"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        // First verify the user has access to this team
+        const membership = await ctx.prisma.teamMember.findUnique({
+          where: {
+            teamId_userId: {
+              teamId: input.teamId,
+              userId: ctx.userId!,
+            },
+          },
+        });
+
+        if (!membership) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this team",
+          });
+        }
+
+        // Get checklist tasks with assignments
+        const tasks = await serverGetTasks({
+          teamId: input.teamId,
+          date: "", // Date is not relevant for checklists
+          type: "checklist",
+          userId: ctx.userId!,
+        });
+
+        const teamMembers = await serverGetTeamMembers({
+          ctx,
+          teamId: input.teamId,
+          userId: ctx.userId!,
+        });
+
+        // Get completions for checklist items (without date filter)
+        const completions = await ctx.prisma.taskCompletion.findMany({
+          where: {
+            task: {
+              teamId: input.teamId,
+              type: "checklist",
+              isDeleted: false,
+            },
+          },
+          include: {
+            task: true,
+            user: true,
+          },
+        });
+
+        return {
+          teamMembers,
+          tasks,
+          completions,
+        };
+      } catch (error) {
+        console.error("Error fetching checklists:", error);
+        if (error instanceof TRPCError) throw error;
+        return null;
       }
     }),
 });

@@ -52,6 +52,8 @@ model Task {
   createdAt   DateTime?    @default(now()) @map("created_at") @db.Timestamptz(6)
   teamId      String?      @map("team_id") @db.Uuid
   isDeleted   Boolean      @default(false) @map("is_deleted")
+  type        String       @default("daily") @map("type") @db.VarChar(50)
+  visibility  String       @default("team") @map("visibility") @db.VarChar(50)
   completions TaskCompletion[]
   assignments TaskAssignment[]
   parent      Task?        @relation("TaskToTask", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -99,7 +101,7 @@ model TaskCompletion {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   taskId        String    @map("task_id") @db.Uuid
   userId        String    @map("user_id") @db.Uuid
-  completionDate DateTime  @map("completion_date") @db.Date
+  completionDate DateTime?  @map("completion_date") @db.Date
   completedAt   DateTime? @default(now()) @map("completed_at") @db.Timestamptz(6)
   task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)

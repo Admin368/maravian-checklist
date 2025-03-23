@@ -35,6 +35,7 @@ interface TaskDialogProps {
   };
   tasks: any[];
   teamId: string;
+  teamName?: string;
 }
 
 export function TaskDialog({
@@ -45,6 +46,7 @@ export function TaskDialog({
   initialData,
   tasks,
   teamId,
+  teamName,
 }: TaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState(initialData?.title || "");
   const [parentId, setParentId] = useState<string | null>(
@@ -52,45 +54,44 @@ export function TaskDialog({
   );
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [didInitialize, setDidInitialize] = useState(false);
 
   useEffect(() => {
-    // When initialData changes, update the form
-    if (initialData) {
+    // Only update the form when initialData changes and dialog is first opened
+    // or when editing a different task
+    if (
+      initialData &&
+      open &&
+      (!didInitialize || initialData.id !== parentId)
+    ) {
       // If it has a parentId, set it (used when adding subtasks)
       if (initialData.parentId) {
         setParentId(initialData.parentId);
-      }
-
-      // If it has a title, set it (used when editing tasks)
-      if (initialData.title) {
-        setTaskTitle(initialData.title);
       } else {
-        // For new subtasks, reset the title
-        setTaskTitle("");
-      }
-    } else {
-      // Reset form for completely new tasks
-      setTaskTitle("");
-      setParentId(null);
-    }
-
-    // Reset error and submission state
-    setError("");
-    setIsSubmitting(false);
-  }, [initialData]);
-
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (open && !initialData?.id) {
-      // Only reset the title if it's a new top-level task (no parentId)
-      if (!initialData?.parentId) {
-        setTaskTitle("");
         setParentId(null);
       }
+
+      // If it has a title and we're editing, set it
+      if (initialData.id && initialData.title) {
+        setTaskTitle(initialData.title);
+      } else if (!didInitialize) {
+        // For new tasks, reset the title only on first initialization
+        setTaskTitle("");
+      }
+
+      // Reset error and submission state
       setError("");
       setIsSubmitting(false);
+      setDidInitialize(true);
     }
-  }, [open, initialData]);
+  }, [initialData, open, didInitialize, parentId]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setDidInitialize(false);
+    }
+  }, [open]);
 
   // Add logging to see what's happening
   useEffect(() => {
@@ -129,10 +130,10 @@ export function TaskDialog({
         <DialogHeader>
           <DialogTitle>
             {initialData?.id
-              ? "Edit Task"
+              ? `Edit ${teamName ? teamName + " " : ""}Task`
               : initialData?.parentId
-              ? "Add Subtask"
-              : "Add Task"}
+              ? `Add ${teamName ? teamName + " " : ""}Subtask`
+              : `Add ${teamName ? teamName + " " : ""}Task`}
           </DialogTitle>
           <DialogDescription>
             {initialData?.id
@@ -141,7 +142,7 @@ export function TaskDialog({
               ? `Adding subtask to "${
                   tasks.find((t) => t.id === initialData.parentId)?.title || ""
                 }"`
-              : "Add a new task to the checklist."}
+              : `Add a new task ${teamName ? "for " + teamName : ""}.`}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>

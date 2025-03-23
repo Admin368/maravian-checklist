@@ -21,8 +21,12 @@ const getAllByDateSchema = z.object({
 const toggleSchema = z.object({
   userId: z.string().uuid(),
   taskId: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(), // YYYY-MM-DD format (optional for checklists)
   completed: z.boolean(),
+  isChecklist: z.boolean().optional(),
 });
 
 type GetByDateInput = z.infer<typeof getByDateSchema>;
@@ -173,8 +177,33 @@ export const completionsRouter = router({
           });
         }
 
-        // First verify the user has access to this task
-        const task = await prisma.task.findFirst({
+        // For non-checklist items (daily tasks), verify check-in status
+        if (!input.isChecklist) {
+          if (!input.date) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Date is required for daily tasks",
+            });
+          }
+
+          // Check if the user has checked in for the day
+          const checkIn = await ctx.prisma.checkIn.findFirst({
+            where: {
+              userId: ctx.userId,
+              checkInDate: toISODateTime(input.date),
+            },
+          });
+
+          if (!checkIn && input.completed) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "You must check in before completing tasks",
+            });
+          }
+        }
+
+        // Verify the user has access to the task
+        const task = await ctx.prisma.task.findFirst({
           where: {
             id: input.taskId,
             isDeleted: false,
@@ -199,81 +228,68 @@ export const completionsRouter = router({
           });
         }
 
-        if (!task.team?.members || task.team.members.length === 0) {
+        if (!task.team?.members.length) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "You don't have access to this task",
           });
         }
 
-        // Check if the user has checked in for the day
-        // const checkIn = await prisma.checkIn.findFirst({
-        //   where: {
-        //     teamId: task.team.id,
-        //     userId: ctx.userId,
-        //     checkInDate: {
-        //       equals: input.date,
-        //     },
-        //   },
-        // });
+        // Handle task completion toggle
+        if (input.completed) {
+          // Mark task as completed
+          const completionDate = input.date ? toISODateTime(input.date) : null;
 
-        // if (!checkIn) {
-        //   throw new TRPCError({
-        //     code: "BAD_REQUEST",
-        //     message: "You must check in before completing tasks",
-        //   });
-        // }
-
-        // Get existing completion
-        const existingCompletion = await prisma.taskCompletion.findFirst({
-          where: {
-            taskId: input.taskId,
-            completionDate: toISODateTime(input.date),
-            task: {
-              team: {
-                id: task.team.id,
-              },
-            },
-          },
-        });
-
-        if (existingCompletion) {
-          // Delete the completion
-          await prisma.taskCompletion.delete({
+          // Check if completion already exists
+          const existingCompletion = await ctx.prisma.taskCompletion.findFirst({
             where: {
-              id: existingCompletion.id,
-            },
-          });
-
-          return {
-            success: true,
-            message: "Task marked as incomplete for the team",
-            completed: false,
-          };
-        } else {
-          // Create the completion
-          const date = toISODateTime(input.date);
-          const completion = await prisma.taskCompletion.create({
-            data: {
               taskId: input.taskId,
               userId: ctx.userId,
-              completionDate: date,
+              ...(completionDate ? { completionDate } : {}),
             },
           });
 
-          return {
-            success: true,
-            message: "Task marked as complete for the team",
-            completed: true,
-            completion,
-          };
+          if (!existingCompletion) {
+            await ctx.prisma.taskCompletion.create({
+              data: {
+                taskId: input.taskId,
+                userId: ctx.userId,
+                ...(completionDate ? { completionDate } : {}),
+              },
+            });
+          }
+        } else {
+          // Remove completion
+          const completionDate = input.date ? toISODateTime(input.date) : null;
+
+          if (completionDate) {
+            // For daily tasks with date
+            await ctx.prisma.taskCompletion.deleteMany({
+              where: {
+                taskId: input.taskId,
+                userId: ctx.userId,
+                completionDate,
+              },
+            });
+          } else {
+            // For checklist items without date
+            await ctx.prisma.taskCompletion.deleteMany({
+              where: {
+                taskId: input.taskId,
+                userId: ctx.userId,
+                completionDate: null,
+              },
+            });
+          }
         }
+
+        return { success: true };
       } catch (error) {
-        console.error("Error toggling completion:", error);
+        console.error("Error toggling task completion:", error);
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to toggle task completion",
+          message: "Failed to update task status",
         });
       }
     }),

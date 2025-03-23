@@ -456,7 +456,7 @@ export function TaskList({
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : (
-                  <div>
+                  <div className="space-y-2">
                     {topLevelTasks.map((task) => (
                       <TaskItem
                         key={task.id}

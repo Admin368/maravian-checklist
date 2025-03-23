@@ -134,17 +134,30 @@ export function TaskItem({
   useEffect(() => {
     if (!completions || !teamMembers) return;
 
-    const completion = completions.find((c) => c.taskId === task.id);
+    // For checklist items (selectedDate === "*"), find completion without a date
+    const completion = completions.find((c) => {
+      if (selectedDate === "*") {
+        // For checklists, find the completion without a date or with a null date
+        return (
+          c.taskId === task.id &&
+          (!c.completionDate || c.completionDate === null)
+        );
+      } else {
+        // For regular tasks, match the date
+        return c.taskId === task.id;
+      }
+    });
 
     if (completion) {
       setIsCompleted(true);
       setCompletedBy(completion.userId);
+      // Try to use completedAt first, then fall back to completionDate or creation time
       setCompletedAt(
         completion.completedAt
           ? new Date(completion.completedAt)
           : completion.completionDate
           ? new Date(completion.completionDate)
-          : null
+          : new Date()
       );
     } else {
       setIsCompleted(false);
@@ -159,63 +172,90 @@ export function TaskItem({
     : null;
 
   const handleCheckboxChange = async (checked: boolean | "indeterminate") => {
-    if (!userId || typeof checked !== "boolean") return;
+    if (checked === "indeterminate") return;
 
-    // Store the pending completion state
-    setPendingCompletion(checked);
-    setShowCompletionModal(true);
-  };
+    // For normal tasks, require a check-in and show a confirmation modal
+    if (selectedDate !== "*") {
+      // Store the pending completion state and show confirmation modal
+      setPendingCompletion(checked);
+      setShowCompletionModal(true);
+      return;
+    }
 
-  const completeTask = async (checked: boolean) => {
+    // For checklist items (no date required), directly complete without confirmation
+    // Get current date or "*" for checklists
+    const date =
+      selectedDate === "*"
+        ? undefined
+        : typeof selectedDate === "string"
+        ? selectedDate
+        : format(selectedDate, "yyyy-MM-dd");
+
+    // Optimistic update
+    setIsCompleted(!!checked);
+    setCompletedBy(checked ? userId : null);
+    setCompletedAt(checked ? new Date() : null);
+
     try {
-      if (!isCheckedIn) {
-        console.log("Not checked in");
-        toast.error("Error", {
-          description: "You must check in before completing tasks",
-        });
-        toast.info("You must check in before completing tasks");
-        return;
-      }
-      // Optimistically update UI
-      setIsCompleted(checked);
-      if (checked) {
-        setCompletedBy(userId);
-        setCompletedAt(new Date());
-      } else {
-        setCompletedBy(null);
-        setCompletedAt(null);
-      }
-
-      // Call the API to update the task status
       await toggleCompletion.mutateAsync({
-        taskId: task.id,
         userId: userId!,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        completed: checked,
+        taskId: task.id,
+        date: date,
+        completed: !!checked,
+        isChecklist: selectedDate === "*",
       });
-
-      // Refetch to ensure data consistency
       refetch?.();
     } catch (error) {
-      console.error("Failed to toggle completion:", error);
-      // Reset UI state
+      console.error("Failed to toggle task completion:", error);
+      // Revert optimistic update
       setIsCompleted(!checked);
       setCompletedBy(checked ? null : userId);
       setCompletedAt(null);
 
-      // Display the error message
-      if (error instanceof Error) {
-        toast.error("Error", {
-          description:
-            error.message || "Failed to update task status. Please try again.",
-        });
-      }
+      toast.error("Error", {
+        description: "Failed to update task status. Please try again.",
+      });
     }
   };
 
   const handleConfirmCompletion = () => {
     if (pendingCompletion !== null) {
-      completeTask(!!pendingCompletion);
+      // Get current date for regular tasks
+      const date =
+        typeof selectedDate === "string"
+          ? selectedDate
+          : format(selectedDate, "yyyy-MM-dd");
+
+      // Optimistic update
+      setIsCompleted(!!pendingCompletion);
+      setCompletedBy(pendingCompletion ? userId : null);
+      setCompletedAt(pendingCompletion ? new Date() : null);
+
+      // Call the API to update the task status
+      toggleCompletion
+        .mutateAsync({
+          userId: userId!,
+          taskId: task.id,
+          date: date,
+          completed: !!pendingCompletion,
+          isChecklist: false,
+        })
+        .then(() => {
+          refetch?.();
+        })
+        .catch((error) => {
+          console.error("Failed to toggle task completion:", error);
+          // Revert optimistic update
+          setIsCompleted(!pendingCompletion);
+          setCompletedBy(pendingCompletion ? null : userId);
+          setCompletedAt(null);
+
+          toast.error("Error", {
+            description:
+              error.message ||
+              "Failed to update task status. Please try again.",
+          });
+        });
     }
     setShowCompletionModal(false);
     setPendingCompletion(null);
@@ -268,188 +308,184 @@ export function TaskItem({
   };
 
   return (
-    <>
-      <div
-        className={cn(
-          "group flex flex-col md:flex-row md:items-center justify-between py-2 px-1 md:pr-2 border-b",
-          className
-        )}
-      >
-        <div className="flex items-start md:items-center gap-2 min-w-0 flex-1">
-          <div
-            className={cn("pl-[10px] md:pl-[20px]", {
-              "pl-[20px] md:pl-[40px]": level === 1,
-              "pl-[30px] md:pl-[60px]": level === 2,
-              "pl-[40px] md:pl-[80px]": level === 3,
-              "pl-[50px] md:pl-[100px]": level >= 4,
-            })}
-          >
-            {childTasks.length > 0 ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-5 h-5 md:w-6 md:h-6"
-                onClick={() => setExpanded(!expanded)}
-              >
-                {expanded ? (
-                  <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
-                )}
-              </Button>
-            ) : (
-              <div className="w-4 md:w-5" />
-            )}
+    <div
+      className={cn(
+        "group relative rounded-lg border pb-2",
+        isCompleted ? "border-muted bg-muted/20" : "border-border",
+        className
+      )}
+      style={{ marginLeft: `${level * 20}px` }}
+      id={`task-${task.id}`}
+    >
+      <div className="flex items-center p-3">
+        <div className="flex-1 flex items-center min-w-0">
+          {/* Expand/collapse button for parent tasks */}
+          {!!childTasks.length && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 mr-1 text-muted-foreground"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+
+          {/* Empty space to align tasks without children */}
+          {!childTasks.length && (
+            <div className="w-7" /> // This ensures alignment with parent tasks
+          )}
+
+          {/* Checkbox */}
+          <div className="mr-2">
+            <Checkbox
+              id={`task-checkbox-${task.id}`}
+              checked={isCompleted}
+              disabled={!isCheckedIn}
+              onCheckedChange={handleCheckboxChange}
+            />
           </div>
 
-          {/* Main task content */}
-          <div className="flex items-start md:items-center min-w-0 flex-1">
-            <Checkbox
-              id={task.id}
-              checked={isCompleted}
-              onCheckedChange={handleCheckboxChange}
-              disabled={!isCheckedIn}
-              className={cn(
-                "transition-opacity mr-2 mt-1 md:mt-0",
-                !isCheckedIn && "opacity-50",
-                isCompleted && "opacity-50"
-              )}
-            />
-            <div className="flex flex-col min-w-0 flex-1 gap-1">
-              <div
+          {/* Task title */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center">
+              <span
                 className={cn(
-                  "flex items-center flex-wrap min-w-0 break-words",
+                  "truncate text-sm",
                   isCompleted && "line-through text-muted-foreground"
                 )}
               >
-                <div className="break-words flex-1 min-w-0 text-sm md:text-base">
-                  {task.title}
-                </div>
-              </div>
+                {task.title}
+              </span>
 
-              {/* Assigned users */}
-              {assignedUsers.length > 0 && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <UserCircle className="h-3 w-3" />
-                  <span>
-                    Assigned to:{" "}
-                    {assignedUsers.map((user) => user?.name).join(", ")}
-                  </span>
-                </div>
-              )}
-
-              {/* Completed by information */}
-              {isCompleted && completerName && (
-                <div className="flex flex-col md:flex-row md:items-center gap-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <UserCircle className="h-3 w-3" />
-                    <span>Completed by: {completerName}</span>
-                  </div>
-                  {completedAt && (
-                    <TaskCompletionTime
-                      completedAt={completedAt}
-                      className="md:ml-2"
-                    />
-                  )}
-                </div>
+              {/* Add badge for checklist items when they appear in regular task lists */}
+              {(task as any).type === "checklist" && selectedDate !== "*" && (
+                <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                  Checklist
+                </span>
               )}
             </div>
+
+            {isCompleted && completerName && (
+              <div className="text-xs text-muted-foreground flex items-center mt-1">
+                <UserCircle className="h-3 w-3 mr-1" />
+                <span>
+                  Completed by {completerName}{" "}
+                  {completedAt && format(completedAt, "h:mm a")}
+                </span>
+              </div>
+            )}
+
+            {/* Display assigned users */}
+            {assignedUsers.length > 0 && (
+              <div className="text-xs text-muted-foreground flex items-center mt-1">
+                <UserCircle className="h-3 w-3 mr-1" />
+                <span>
+                  Assigned to:{" "}
+                  {assignedUsers.map((user) => user?.name).join(", ")}
+                </span>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Task actions - visible on mobile, not just on hover */}
-        <div
-          className={cn(
-            "flex items-center gap-1 mt-2 md:mt-0 self-end md:self-auto",
-            !hideTools || showReorderButtons
-              ? "md:invisible md:group-hover:visible"
-              : ""
-          )}
-        >
-          {/* Move buttons - only show when reordering is enabled */}
-          {showReorderButtons && currentIndex !== -1 && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onMoveTask?.(task.id, "up")}
-                className="h-7 w-7 md:h-8 md:w-8"
-              >
-                <ArrowUp className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="sr-only">Move Up</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onMoveTask?.(task.id, "down")}
-                className="h-7 w-7 md:h-8 md:w-8"
-              >
-                <ArrowDown className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="sr-only">Move Down</span>
-              </Button>
-            </>
-          )}
-
-          {!hideTools && (
-            <>
-              {isAdmin && (
+          {/* Task action buttons */}
+          <div
+            className={cn(
+              "flex items-center gap-1 mt-2 md:mt-0 self-end md:self-auto",
+              !hideTools || showReorderButtons
+                ? "md:invisible md:group-hover:visible"
+                : ""
+            )}
+          >
+            {/* Move buttons - only show when reordering is enabled */}
+            {showReorderButtons && currentIndex !== -1 && (
+              <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => onAddSubtask?.(task.id)}
+                  onClick={() => onMoveTask?.(task.id, "up")}
                   className="h-7 w-7 md:h-8 md:w-8"
                 >
-                  <Plus className="h-3 w-3 md:h-4 md:w-4" />
-                  <span className="sr-only">Add Subtask</span>
+                  <ArrowUp className="h-3 w-3 md:h-4 md:w-4" />
+                  <span className="sr-only">Move Up</span>
                 </Button>
-              )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onMoveTask?.(task.id, "down")}
+                  className="h-7 w-7 md:h-8 md:w-8"
+                >
+                  <ArrowDown className="h-3 w-3 md:h-4 md:w-4" />
+                  <span className="sr-only">Move Down</span>
+                </Button>
+              </>
+            )}
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            {!hideTools && (
+              <>
+                {isAdmin && (
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => onAddSubtask?.(task.id)}
                     className="h-7 w-7 md:h-8 md:w-8"
                   >
-                    <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="sr-only">More</span>
+                    <Plus className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="sr-only">Add Subtask</span>
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={copyTaskToClipboard}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy text
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem
-                      onClick={() => setShowAssignmentDialog(true)}
+                )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 md:h-8 md:w-8"
                     >
-                      <Users className="mr-2 h-4 w-4" />
-                      Manage Assignments
+                      <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
+                      <span className="sr-only">More</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={copyTaskToClipboard}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy text
                     </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => onEditTask?.(task)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => onDeleteTask?.(task.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
+                    {isAdmin && (
+                      <DropdownMenuItem
+                        onClick={() => setShowAssignmentDialog(true)}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Manage Assignments
+                      </DropdownMenuItem>
+                    )}
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    )}
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => onDeleteTask?.(task.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Render children if expanded */}
       {expanded && childTasks.length > 0 && (
-        <div className="flex flex-col">
+        <div className="flex flex-col space-y-2">
           {childTasks.map((childTask) => (
             <TaskItem
               key={childTask.id}
@@ -496,6 +532,6 @@ export function TaskItem({
         onCancel={handleCancelCompletion}
         // isCompleted={isCompleted}
       />
-    </>
+    </div>
   );
 }

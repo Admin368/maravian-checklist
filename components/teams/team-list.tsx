@@ -43,12 +43,12 @@ export function TeamList({ teams }: TeamListProps) {
       <Card className="flex h-full flex-col items-center justify-center p-8">
         <div className="flex flex-col items-center space-y-4 text-center">
           <Icons.plus className="h-8 w-8 text-muted-foreground" />
-          <h3 className="text-lg font-medium">Create a new team</h3>
+          <h3 className="text-lg font-medium">Create a new checklist</h3>
           <p className="text-sm text-muted-foreground">
-            Create a new team to collaborate with others
+            Create a new checklist to collaborate with others
           </p>
           <Button asChild>
-            <Link href="/teams/new">Create Team</Link>
+            <Link href="/teams/new">Create Checklist</Link>
           </Button>
         </div>
       </Card>

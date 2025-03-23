@@ -721,11 +721,15 @@ export const teamsRouter = router({
               },
             });
 
-            // Step 3: Get all tasks from the source team, organized by levels
+            // Copy tasks with assignments
+            // Step 3: Get all tasks from the source team with their assignments
             const allTasks = await tx.task.findMany({
               where: {
                 teamId: input.teamId,
                 isDeleted: false,
+              },
+              include: {
+                assignments: true,
               },
               orderBy: [{ parentId: "asc" }, { position: "asc" }],
             });
@@ -744,9 +748,23 @@ export const teamsRouter = router({
                   title: task.title,
                   position: task.position,
                   teamId: team.id,
+                  type: task.type, // Include task type (daily/checklist)
+                  visibility: task.visibility, // Include visibility setting
                 },
               });
               taskIdMap.set(task.id, newTask.id);
+
+              // Copy assignments for this task
+              if (task.assignments && task.assignments.length > 0) {
+                for (const assignment of task.assignments) {
+                  await tx.taskAssignment.create({
+                    data: {
+                      taskId: newTask.id,
+                      userId: assignment.userId,
+                    },
+                  });
+                }
+              }
             }
 
             // Step 5: Process child tasks level by level to maintain parent-child relationships
@@ -778,11 +796,25 @@ export const teamsRouter = router({
                     position: childTask.position,
                     teamId: team.id,
                     parentId: taskIdMap.get(childTask.parentId!),
+                    type: childTask.type, // Include task type (daily/checklist)
+                    visibility: childTask.visibility, // Include visibility setting
                   },
                 });
 
                 taskIdMap.set(childTask.id, newTask.id);
                 processedParentIds.push(childTask.id);
+
+                // Copy assignments for this child task
+                if (childTask.assignments && childTask.assignments.length > 0) {
+                  for (const assignment of childTask.assignments) {
+                    await tx.taskAssignment.create({
+                      data: {
+                        taskId: newTask.id,
+                        userId: assignment.userId,
+                      },
+                    });
+                  }
+                }
               }
             }
 

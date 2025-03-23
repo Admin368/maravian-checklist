@@ -182,8 +182,8 @@ export function TeamsList() {
             {isEnteringTeam
               ? "Joining..."
               : isJoined
-              ? "Enter Team"
-              : "Join Team"}
+              ? "Enter Checklist"
+              : "Join Checklist"}
           </Button>
         </CardContent>
         <CardFooter>
@@ -247,18 +247,18 @@ export function TeamsList() {
       {/* Joined Teams Section */}
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold tracking-tight">My Teams</h2>
+          <h2 className="text-2xl font-bold tracking-tight">My Checklists</h2>
           <Button onClick={handleGoToCreateTeam}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Team
+            Create Checklist
           </Button>
         </div>
 
         {!joinedTeams?.length ? (
           <div className="text-center p-8 border rounded-lg bg-muted/50">
-            <h3 className="text-lg font-medium mb-2">No Joined Teams</h3>
+            <h3 className="text-lg font-medium mb-2">No Joined Checklists</h3>
             <p className="text-muted-foreground mb-4">
-              {`You haven't joined any teams yet. Search for teams to join or create your own.`}
+              {`You haven't joined any checklists yet. Search for checklists to join or create your own.`}
             </p>
             <Button onClick={handleGoToCreateTeam}>
               <Plus className="mr-2 h-4 w-4" />
@@ -274,28 +274,32 @@ export function TeamsList() {
 
       {/* Search Teams Section */}
       <div>
-        <h2 className="text-2xl font-bold tracking-tight mb-4">Find Teams</h2>
+        <h2 className="text-2xl font-bold tracking-tight mb-4">
+          Find Checklists
+        </h2>
 
         <div className="flex flex-col gap-4">
           {renderSearchInput(searchQuery, setSearchQuery)}
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All Teams</TabsTrigger>
-              <TabsTrigger value="joined">Joined Teams</TabsTrigger>
-              <TabsTrigger value="created">My Teams</TabsTrigger>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="joined">Joined</TabsTrigger>
+              <TabsTrigger value="created">By Me</TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="pt-4">
               {!filteredTeams?.length ? (
                 <div className="text-center p-8 border rounded-lg bg-muted/50">
-                  <h3 className="text-lg font-medium mb-2">No Teams Found</h3>
+                  <h3 className="text-lg font-medium mb-2">
+                    No Checklists Found
+                  </h3>
                   <p className="text-muted-foreground mb-4">
-                    Create a new team or try a different search term.
+                    Create a new checklist or try a different search term.
                   </p>
                   <Button onClick={handleGoToCreateTeam}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Team
+                    Create Checklist
                   </Button>
                 </div>
               ) : (

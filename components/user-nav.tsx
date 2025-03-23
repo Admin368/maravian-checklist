@@ -58,7 +58,7 @@ export function UserNav() {
         <DropdownMenuItem asChild>
           <Link href="/teams">
             <Icons.users className="mr-2 h-4 w-4" />
-            My Teams
+            My Checklists
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

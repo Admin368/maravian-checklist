@@ -37,6 +37,7 @@ import { format } from "date-fns";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/date-picker";
 import { CloneTeamButton } from "@/components/clone-team-button";
+import { ChecklistComponent } from "@/components/checklist";
 
 export default function TeamPage() {
   const params = useParams();
@@ -284,14 +285,22 @@ export default function TeamPage() {
                 onClick={() => setActiveTab("tasks")}
                 className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
               >
-                Tasks
+                Recurring
+              </TabsTrigger>
+              <TabsTrigger
+                value="checklists"
+                // onClick={() => router.push(`/team/${slug}/checklists`)}
+                onClick={() => setActiveTab("checklists")}
+                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
+              >
+                LongTerm
               </TabsTrigger>
               <TabsTrigger
                 value="members"
                 onClick={() => setActiveTab("members")}
                 className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
               >
-                <span className="hidden sm:inline">Team </span>Members
+                Members
               </TabsTrigger>
               <TabsTrigger
                 value="check-ins"
@@ -305,10 +314,17 @@ export default function TeamPage() {
             <TabsContent value="tasks" className="mt-0">
               <div className="flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                  <DatePicker
-                    date={selectedDate}
-                    onDateChange={setSelectedDate}
-                  />
+                  <div className="flex flex-col mb-4">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {`Daily recurring tasks that happen frequently and are
+                      tracked separately for each day. When completed, they're
+                      recorded for the specific date selected.`}
+                    </p>
+                    <DatePicker
+                      date={selectedDate}
+                      onDateChange={setSelectedDate}
+                    />
+                  </div>
                   {/* <div className="flex space-x-2">
                     <Button
                       onClick={() => {
@@ -334,6 +350,22 @@ export default function TeamPage() {
                   />
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent
+              value="checklists"
+              className="space-y-4 sm:space-y-6 mt-0"
+            >
+              <p className="text-sm text-muted-foreground mb-4">
+                Long-term tasks represent ongoing responsibilities or one-time
+                activities that persist over time. When completed, they remain
+                checked off regardless of the date.
+              </p>
+              <ChecklistComponent
+                teamId={team?.id || ""}
+                teamName={team?.name || ""}
+                isAdmin={isAdmin}
+              />
             </TabsContent>
 
             <TabsContent

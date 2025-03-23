@@ -187,18 +187,13 @@ export function UserList({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle>
-            {showTime ? "Checked-in Members" : "Team Members"}
-          </CardTitle>
-          <CardDescription>
-            {isUserAdmin || isAdmin ? "Admin" : "Member"}
-          </CardDescription>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-xl">Members</CardTitle>
           <CardDescription>
             {teamMembers.length}{" "}
             {teamMembers.length === 1 ? "member" : "members"}{" "}
-            {showTime ? "checked in" : "in the team"}
+            {showTime ? "checked in" : "in the Checklist"}
           </CardDescription>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose}>

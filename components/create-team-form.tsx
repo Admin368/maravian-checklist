@@ -89,16 +89,16 @@ export function CreateTeamForm() {
   return (
     <Card className="max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Create a New Team</CardTitle>
-        <CardDescription>Set up a new team for your tasks</CardDescription>
+        <CardTitle>Create a New Checklist</CardTitle>
+        <CardDescription>Set up a new checklist for your tasks</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="team-name">Team Name</Label>
+            <Label htmlFor="team-name">Checklist Name</Label>
             <Input
               id="team-name"
-              placeholder="Enter team name"
+              placeholder="Enter checklist name"
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
               required
@@ -116,7 +116,7 @@ export function CreateTeamForm() {
               minLength={4}
             />
             <p className="text-xs text-muted-foreground">
-              This password will be used by team members to join your team.
+              This password will be used by team members to join your checklist.
             </p>
           </div>
           <div className="space-y-2">
@@ -127,7 +127,7 @@ export function CreateTeamForm() {
                 onCheckedChange={setIsPrivate}
               />
               <Label htmlFor="private-mode">
-                Private Team (hidden from home page)
+                Private Checklist (hidden from home page)
               </Label>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -142,10 +142,10 @@ export function CreateTeamForm() {
                 checked={isCloneable}
                 onCheckedChange={setIsCloneable}
               />
-              <Label htmlFor="cloneable-mode">Allow team cloning</Label>
+              <Label htmlFor="cloneable-mode">Allow checklist cloning</Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              {`When enabled, members can clone this team to create their own version with all tasks intact.`}
+              {`When enabled, members can clone this checklist to create their own version with all tasks intact.`}
             </p>
           </div>
         </CardContent>
@@ -164,7 +164,7 @@ export function CreateTeamForm() {
                 Creating...
               </>
             ) : (
-              "Create Team"
+              "Create Checklist"
             )}
           </Button>
         </CardFooter>

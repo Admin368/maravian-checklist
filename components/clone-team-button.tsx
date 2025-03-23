@@ -169,14 +169,14 @@ export function CloneTeamButton({
           }}
         >
           <Copy className="mr-2 h-4 w-4" />
-          Make own copy of this team
+          Make own copy of this checklist
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Clone Team</DialogTitle>
+          <DialogTitle>Clone Checklist</DialogTitle>
           <DialogDescription>
-            Create a new team with all tasks from {teamName}
+            Create a new checklist with all tasks from {teamName}
           </DialogDescription>
         </DialogHeader>
         {errors.general && (
@@ -189,7 +189,7 @@ export function CloneTeamButton({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="team-name">New Team Name</Label>
+              <Label htmlFor="team-name">New Checklist Name</Label>
               <Input
                 id="team-name"
                 value={newTeamName}
@@ -197,7 +197,7 @@ export function CloneTeamButton({
                   setNewTeamName(e.target.value);
                   setErrors({ ...errors, teamName: undefined });
                 }}
-                placeholder="Enter team name"
+                placeholder="Enter checklist name"
                 required
                 className={errors.teamName ? "border-red-500" : ""}
               />
@@ -215,7 +215,7 @@ export function CloneTeamButton({
                   setPassword(e.target.value);
                   setErrors({ ...errors, password: undefined });
                 }}
-                placeholder="Set a password for your team"
+                placeholder="Set a password for your checklist"
                 required
                 minLength={4}
                 className={errors.password ? "border-red-500" : ""}
@@ -224,7 +224,8 @@ export function CloneTeamButton({
                 <p className="text-sm text-red-500">{errors.password}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                This password will be used by team members to join your team.
+                This password will be used by team members to join your
+                checklist.
               </p>
             </div>
             <div className="flex items-center space-x-2">

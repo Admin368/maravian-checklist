@@ -10,6 +10,8 @@ import {
   Loader2,
   RefreshCw,
   ArrowUpDown,
+  EyeIcon,
+  EyeOffIcon,
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { DatePicker } from "./date-picker";
@@ -23,6 +25,7 @@ import { Task } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
+import { UserCircle } from "lucide-react";
 
 interface TeamMember {
   id: string;
@@ -50,6 +53,7 @@ export function TaskList({
   const [hideTools, setHideTools] = useState(false);
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
   const [showReorderButtons, setShowReorderButtons] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
   // const today = format(new Date(), "yyyy-MM-dd");
 
   // const formattedDate = selectedDate.toISOString().split("T")[0];
@@ -104,6 +108,15 @@ export function TaskList({
     tasks
       ?.filter((task: Task) => task.parentId === null)
       .sort((a: Task, b: Task) => a.position - b.position) || [];
+
+  const visibleTasks = showCompleted
+    ? topLevelTasks
+    : topLevelTasks.filter((task: any) => {
+        const isTaskCompleted = completions?.some(
+          (c: any) => c.taskId === task.id
+        );
+        return !isTaskCompleted;
+      });
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
@@ -298,30 +311,45 @@ export function TaskList({
   }
 
   return (
-    <div className="flex-1 overflow-hidden">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-          <h1 className="text-xl md:text-2xl font-bold">{teamName}</h1>
-          <div className="text-sm text-muted-foreground">
-            Logged in as: {userName}
-          </div>
+    <div className="w-full max-w-full overflow-hidden">
+      <div className="flex flex-col justify-between items-start mb-4 gap-4">
+        <div className="flex flex-col gap-2 w-full">
+          <h3 className="text-xl font-semibold">{teamName}</h3>
+          <p className="text-sm text-muted-foreground">
+            {format(selectedDate, "EEEE, MMMM do, yyyy")}
+          </p>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription className="flex justify-between items-center">
-              <span>{error}</span>
-              <Button variant="outline" size="sm" onClick={handleDismissError}>
-                Dismiss
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <div className="flex items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "gap-2",
+                showCompleted && "bg-muted text-muted-foreground"
+              )}
+              onClick={() => setShowCompleted(!showCompleted)}
+            >
+              {showCompleted ? (
+                <>
+                  <EyeOffIcon className="h-4 w-4" />
+                  <span className="hidden md:inline">Hide Completed</span>
+                </>
+              ) : (
+                <>
+                  <EyeIcon className="h-4 w-4" />
+                  <span className="hidden md:inline">Show Completed</span>
+                </>
+              )}
+            </Button>
+          </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
-          <DatePicker date={selectedDate} onDateChange={handleDateChange} />
+          {/* <DatePicker
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+          /> */}
+
           {isAdmin && (
             <Button
               variant="outline"
@@ -330,6 +358,7 @@ export function TaskList({
                 setEditingTask(null);
                 setShowTaskDialog(true);
               }}
+              className="flex-shrink-0"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Task
@@ -339,153 +368,150 @@ export function TaskList({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowUserList(true)}
+            onClick={() => setShowUserList(!showUserList)}
+            className="flex-shrink-0"
           >
             <Users className="h-4 w-4 mr-2" />
             Team Members
+            <span className="sr-only">Toggle Team Members</span>
           </Button>
-        </div>
 
-        {showUserList && teamMembers && (
-          <UserList
-            teamId={teamId}
-            teamMembers={teamMembers}
-            onClose={() => setShowUserList(false)}
-            refetch={refetch}
-          />
-        )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch?.()}
+            className="flex-shrink-0"
+          >
+            <RefreshCw
+              className={cn(
+                "h-4 w-4",
+                (isLoading || isRefetching) && "animate-spin"
+              )}
+            />
+            <span className="">Refresh</span>
+          </Button>
 
-        <div className="border rounded-md flex flex-col">
-          <div className="p-2 md:p-4 border-b bg-muted/50">
-            <h2 className="font-semibold text-sm md:text-base">
-              Tasks for {format(selectedDate, "MMMM d, yyyy")}
-            </h2>
-          </div>
-          <div className="p-2 md:p-4 border-b bg-muted/50 flex flex-wrap gap-2">
+          {!hideTools && (
             <Button
-              variant="outline"
-              size="sm"
-              disabled={!isAdmin}
-              onClick={() => {
-                setHideTools(!hideTools);
-              }}
-              className="text-xs md:text-sm py-1 px-2 h-auto"
-            >
-              {hideTools ? "Show Task Tools" : "Hide Task Tools"}
-            </Button>
-            <Button
-              variant="outline"
+              variant={showAssignedToMe ? "default" : "outline"}
               size="sm"
               onClick={() => setShowAssignedToMe(!showAssignedToMe)}
-              className="text-xs md:text-sm py-1 px-2 h-auto"
+              className="flex-shrink-0"
             >
-              {showAssignedToMe ? "Show All Tasks" : "Show Only Mine"}
+              <UserCircle className="h-4 w-4 mr-2" />
+              <span className="hidden md:inline">
+                {showAssignedToMe ? "Show All" : "Assigned to Me"}
+              </span>
             </Button>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isRefetching}
-                className="text-xs md:text-sm py-1 px-2 h-auto"
-              >
-                <RefreshCw
-                  className={cn("h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2", {
-                    "animate-spin": isRefetching,
-                  })}
-                />
-                Refresh
-              </Button>
-              {isAdmin && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowReorderButtons(!showReorderButtons)}
-                    className="text-xs md:text-sm py-1 px-2 h-auto"
-                  >
-                    <ArrowUpDown className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                    {showReorderButtons ? "Hide Reorder" : "Reorder"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setEditingTask(null);
-                      setShowTaskDialog(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Task
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          {!checkInStatus?.checkedIn && (
-            <div className="flex flex-1 text-center justify-center p-2 items-center gap-2 text-muted-foreground text-xs md:text-sm">
-              You must be checked in to complete tasks
-            </div>
           )}
-          <div className="">
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex items-center gap-2 p-2">
-                    <Skeleton className="h-4 w-4 rounded-sm" />
-                    <Skeleton className="h-4 w-full" />
-                  </div>
-                ))}
-              </div>
-            ) : tasksError ? (
-              <div className="text-center py-8 text-destructive text-sm">
-                <p>Failed to load tasks. Please try refreshing the page.</p>
-              </div>
-            ) : tasks?.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                <p>No tasks found. Add your first task to get started.</p>
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto p-2 md:p-4">
-                {error && (
-                  <div className="mb-4 text-sm text-red-500">{error}</div>
-                )}
 
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {topLevelTasks.map((task) => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        tasks={tasks || []}
-                        completions={completions || []}
-                        teamMembers={teamMembers || []}
-                        selectedDate={selectedDate}
-                        onAddSubtask={handleAddSubtask}
-                        onEditTask={onEditTask}
-                        onDeleteTask={handleDeleteTask}
-                        onMoveTask={handleMoveTask}
-                        refetch={refetch}
-                        isAdmin={isAdmin}
-                        hideTools={hideTools}
-                        hideNotAssignedToMe={showAssignedToMe}
-                        isCheckedIn={checkInStatus?.checkedIn ?? false}
-                        showReorderButtons={showReorderButtons}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {isAdmin && (
+            <Button
+              variant={showReorderButtons ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowReorderButtons(!showReorderButtons)}
+              className="flex-shrink-0"
+            >
+              <ArrowUpDown className="h-4 w-4 mr-2" />
+              <span className="hidden md:inline">
+                {showReorderButtons ? "Hide Order" : "Reorder"}
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Task Dialog for adding/editing tasks */}
+      {showUserList && teamMembers && (
+        <div className="mb-4 w-full">
+          <UserList teamId={teamId} teamMembers={teamMembers} />
+        </div>
+      )}
+
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="mt-2"
+            onClick={handleDismissError}
+          >
+            Dismiss
+          </Button>
+        </Alert>
+      )}
+
+      {/* Check-in status */}
+      {checkInStatus && !checkInStatus.checkedIn && (
+        <Alert className="mb-4">
+          <AlertTitle>Not Checked In</AlertTitle>
+          <AlertDescription>
+            You need to check in before you can mark tasks as completed.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="space-y-2 w-full">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && visibleTasks.length === 0 && (
+        <div className="text-center py-6 border rounded-lg w-full">
+          <p className="text-muted-foreground">No tasks for this day.</p>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingTask(null);
+                setShowTaskDialog(true);
+              }}
+              className="mt-2"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Task list */}
+      {!isLoading && visibleTasks.length > 0 && (
+        <div className="space-y-2 w-full px-1">
+          {visibleTasks.map((task: Task) => (
+            <TaskItem
+              key={task.id}
+              task={task as any}
+              tasks={tasks as any}
+              completions={completions as any}
+              teamMembers={teamMembers as any}
+              selectedDate={formattedDate}
+              onAddSubtask={handleAddSubtask}
+              onEditTask={onEditTask}
+              onDeleteTask={handleDeleteTask}
+              onMoveTask={handleMoveTask}
+              refetch={refetch as any}
+              isAdmin={isAdmin}
+              hideTools={hideTools}
+              hideNotAssignedToMe={showAssignedToMe}
+              isCheckedIn={checkInStatus?.checkedIn || false}
+              showReorderButtons={showReorderButtons}
+              showCompleted={showCompleted}
+              className="w-full"
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Task dialog */}
       {showTaskDialog && (
         <TaskDialog
           open={showTaskDialog}
@@ -493,9 +519,9 @@ export function TaskList({
             setShowTaskDialog(false);
             setEditingTask(null);
           }}
+          initialData={editingTask}
           onSubmit={editingTask?.id ? handleEditTask : handleAddTask}
           title={editingTask?.id ? "Edit Task" : "Add Task"}
-          initialData={editingTask}
           tasks={tasks || []}
           teamId={teamId}
         />

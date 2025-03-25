@@ -58,10 +58,10 @@ export default function ChecklistsPage() {
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">{teamName} - LongTerm Tasks</h1>
+      <h1 className="text-3xl font-bold mb-6">{teamName}</h1>
 
       <Tabs defaultValue="longterm">
-        <TabsList>
+        <TabsList className="mb-4">
           <TabsTrigger value="longterm">LongTerm Tasks</TabsTrigger>
         </TabsList>
         <TabsContent value="longterm" className="mt-6">

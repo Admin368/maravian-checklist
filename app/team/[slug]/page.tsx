@@ -62,6 +62,11 @@ export default function TeamPage() {
   );
   // const teamMembers = team?.members;
   const { team, teamMembers } = teamData || {};
+
+  // Add isCloneable property with default value if it doesn't exist
+  const teamWithCloneable = team
+    ? { ...team, isCloneable: team?.isCloneable ?? true }
+    : undefined;
   // Verify team access
   const { data: accessData } = api.teams.verifyAccess.useQuery(
     { teamId: team?.id || "" },
@@ -205,9 +210,9 @@ export default function TeamPage() {
           </Button>
 
           <CloneTeamButton
-            teamId={team.id}
-            teamName={team.name}
-            isCloneable={team.isCloneable}
+            teamId={teamWithCloneable?.id || ""}
+            teamName={teamWithCloneable?.name || ""}
+            isCloneable={teamWithCloneable?.isCloneable ?? true}
           />
 
           <Button
@@ -279,33 +284,32 @@ export default function TeamPage() {
         {/* Main content area */}
         <div className="lg:col-span-2">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full max-w-md mx-auto mb-4 sm:mb-8 overflow-hidden">
+            <TabsList className="w-full max-w-md mx-auto mb-4 sm:mb-8 overflow-hidden flex flex-wrap gap-1">
               <TabsTrigger
                 value="tasks"
                 onClick={() => setActiveTab("tasks")}
-                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
+                className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Recurring
               </TabsTrigger>
               <TabsTrigger
                 value="checklists"
-                // onClick={() => router.push(`/team/${slug}/checklists`)}
                 onClick={() => setActiveTab("checklists")}
-                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
+                className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 LongTerm
               </TabsTrigger>
               <TabsTrigger
                 value="members"
                 onClick={() => setActiveTab("members")}
-                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
+                className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Members
               </TabsTrigger>
               <TabsTrigger
                 value="check-ins"
                 onClick={() => setActiveTab("check-ins")}
-                className="flex-1 text-xs sm:text-sm px-1 sm:px-3"
+                className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Check-ins
               </TabsTrigger>

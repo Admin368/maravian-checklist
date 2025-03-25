@@ -22,7 +22,7 @@ For a visual walkthrough of the Maravian CheckList features and functionality, h
 
 ## Introduction
 
-Welcome to Maravian Checklist! This task management system is designed for groups and individuals who need to track regular specified tasks or coordinate events with multiple members. Whether you're managing Sunday media groups, ushering duties, event planning, or personal daily routines, Checklist helps you stay organized and coordinated.
+Welcome to Maravian Checklist! This task management system is designed for groups and individuals who need to track regular specified tasks or coordinate events with multiple members. Whether you're managing Sunday media groups, ushering duties, event planning, sales teams, or personal daily routines, Checklist helps you stay organized and coordinated. For workplace environments, it serves as a powerful tool for managers to track their team's daily activities while maintaining long-term goals and targets.
 
 ## Getting Started
 
@@ -254,6 +254,19 @@ Tasks are accessible through the "Recurring" / "LongTerm" tab in your team's pag
 - Checkout with daily reflections
 - Maintain accountability
 - Use LongTerm for goals and one-time activities
+
+### Sales Team Management
+
+- Create a checklist for your sales team with daily recurring tasks
+- Set up LongTerm tasks for quarterly goals and targets
+- Team members can check in at the start of shifts and check out when done
+- Sales representatives can mark tasks complete and add performance notes
+- Managers can monitor real-time progress and team activity
+- Track attendance with check-in/checkout system
+- Keep records of daily performance with checkout ratings
+- Use task assignments to delegate responsibilities
+- Maintain long-term goals separate from daily activities
+- Generate accountability through visible team progress
 
 ## Need Help?
 

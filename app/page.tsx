@@ -10,7 +10,9 @@ export default function Home() {
           </h1>
           <p className="text-muted-foreground">
             Live task tracker for Teams and individuals for event planning,
-            daily tasks, recurring tasks, and more.
+            daily tasks, recurring tasks, and more. Perfect for workplace
+            environments like sales teams, helping managers track daily tasks
+            and long-term goals.
           </p>
         </div>
 

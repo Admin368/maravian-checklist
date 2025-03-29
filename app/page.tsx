@@ -9,8 +9,9 @@ export default function Home() {
             Welcome to Checklist
           </h1>
           <p className="text-muted-foreground">
-            Live task tracker for Teams and individuals for event planning,
-            daily tasks, recurring tasks, and more.
+            Live task tracker for Teams, Workplaces and Individuals for event
+            planning, daily tasks, recurring tasks, and more. Helping track
+            daily tasks and long-term goals.
           </p>
         </div>
 

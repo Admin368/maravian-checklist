@@ -58,6 +58,7 @@ interface TaskItemProps {
   hideNotAssignedToMe?: boolean;
   isCheckedIn: boolean;
   showReorderButtons?: boolean;
+  showCompleted?: boolean;
 }
 
 export function TaskItem({
@@ -79,6 +80,7 @@ export function TaskItem({
   hideNotAssignedToMe,
   isCheckedIn,
   showReorderButtons = false,
+  showCompleted = false,
 }: TaskItemProps) {
   const { userId } = useUser();
   const [expanded, setExpanded] = useState(true);
@@ -120,6 +122,16 @@ export function TaskItem({
   const childTasks = tasks
     .filter((t) => t.parentId === task.id)
     .sort((a, b) => a.position - b.position);
+
+  // Filter out completed child tasks if showCompleted is false
+  const visibleChildTasks = showCompleted
+    ? childTasks
+    : childTasks.filter((childTask) => {
+        const isChildCompleted = completions?.some(
+          (c) => c.taskId === childTask.id
+        );
+        return !isChildCompleted;
+      });
 
   // Get sibling tasks (tasks at the same level)
   const siblingTasks = tasks
@@ -270,21 +282,18 @@ export function TaskItem({
     }
   };
 
-  // Get assigned users
-  const assignedUsers =
-    task.assignments
-      ?.map((assignment) => {
-        const user = teamMembers.find(
-          (member) => member.id === assignment.userId
-        );
-        return user;
-      })
-      .filter(Boolean) || [];
+  // Filter out tasks not assigned to current user if hideNotAssignedToMe is true
+  const isThisTaskAssignedToMe =
+    userId && task.assignments?.some((a) => a.userId === userId);
+  const assignedUsers = task.assignments
+    ?.map((a) => teamMembers?.find((m) => m.id === a.userId))
+    .filter(Boolean) as serverGetTeamMembersReturnType[];
 
-  const isThisTaskAssignedToMe = assignedUsers.some(
-    (user) => user?.id === userId
-  );
-  if (!isThisTaskAssignedToMe && hideNotAssignedToMe && !childTasks.length) {
+  if (
+    !isThisTaskAssignedToMe &&
+    hideNotAssignedToMe &&
+    !visibleChildTasks.length
+  ) {
     return null;
   }
 
@@ -310,52 +319,62 @@ export function TaskItem({
   return (
     <div
       className={cn(
-        "group relative rounded-lg border pb-2",
+        "group relative rounded-lg border pb-2 w-full",
         isCompleted ? "border-muted bg-muted/20" : "border-border",
         className
       )}
-      style={{ marginLeft: `${level * 20}px` }}
+      style={{
+        marginLeft: level === 0 ? "0px" : "0px",
+        marginRight: "0px",
+      }}
       id={`task-${task.id}`}
     >
-      <div className="flex items-center p-3">
-        <div className="flex-1 flex items-center min-w-0">
+      <div className="flex flex-col p-2">
+        <div className="flex items-start w-full gap-1">
           {/* Expand/collapse button for parent tasks */}
-          {!!childTasks.length && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 mr-1 text-muted-foreground"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          )}
+          <div
+            className="flex items-center flex-shrink-0"
+            style={{
+              paddingLeft: level > 0 ? `${Math.min(level * 16, 48)}px` : "0px",
+            }}
+          >
+            {!!childTasks.length && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 mr-1 p-0 text-muted-foreground"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
 
-          {/* Empty space to align tasks without children */}
-          {!childTasks.length && (
-            <div className="w-7" /> // This ensures alignment with parent tasks
-          )}
+            {/* Empty space to align tasks without children */}
+            {!childTasks.length && (
+              <div className="w-6" /> // This ensures alignment with parent tasks
+            )}
 
-          {/* Checkbox */}
-          <div className="mr-2">
-            <Checkbox
-              id={`task-checkbox-${task.id}`}
-              checked={isCompleted}
-              disabled={!isCheckedIn}
-              onCheckedChange={handleCheckboxChange}
-            />
+            {/* Checkbox */}
+            <div>
+              <Checkbox
+                id={`task-checkbox-${task.id}`}
+                checked={isCompleted}
+                disabled={!isCheckedIn}
+                onCheckedChange={handleCheckboxChange}
+              />
+            </div>
           </div>
 
-          {/* Task title */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center">
+          {/* Task title and badges */}
+          <div className="flex-1 min-w-0 ml-1">
+            <div className="flex items-start flex-wrap">
               <span
                 className={cn(
-                  "truncate text-sm",
+                  "text-sm break-all pr-1 w-full",
                   isCompleted && "line-through text-muted-foreground"
                 )}
               >
@@ -364,16 +383,16 @@ export function TaskItem({
 
               {/* Add badge for checklist items when they appear in regular task lists */}
               {(task as any).type === "checklist" && selectedDate !== "*" && (
-                <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded flex-shrink-0 mt-1">
                   Checklist
                 </span>
               )}
             </div>
 
             {isCompleted && completerName && (
-              <div className="text-xs text-muted-foreground flex items-center mt-1">
-                <UserCircle className="h-3 w-3 mr-1" />
-                <span>
+              <div className="text-xs text-muted-foreground flex items-center mt-1 flex-wrap">
+                <UserCircle className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="break-words">
                   Completed by {completerName}{" "}
                   {completedAt && format(completedAt, "h:mm a")}
                 </span>
@@ -382,23 +401,32 @@ export function TaskItem({
 
             {/* Display assigned users */}
             {assignedUsers.length > 0 && (
-              <div className="text-xs text-muted-foreground flex items-center mt-1">
-                <UserCircle className="h-3 w-3 mr-1" />
-                <span>
+              <div className="text-xs text-muted-foreground flex items-center mt-1 flex-wrap">
+                <UserCircle className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="break-words">
                   Assigned to:{" "}
                   {assignedUsers.map((user) => user?.name).join(", ")}
                 </span>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Task action buttons */}
+        {/* Task action buttons - moved to bottom */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-1 mt-2 pl-[calc(1.5rem+1.5rem)]"
+          style={{
+            paddingLeft:
+              level > 0 ? `${Math.min(level * 16 + 24, 72)}px` : "24px",
+          }}
+        >
+          {/* Reorder buttons with conditional visibility */}
           <div
             className={cn(
-              "flex items-center gap-1 mt-2 md:mt-0 self-end md:self-auto",
+              "flex items-center gap-1",
               !hideTools || showReorderButtons
-                ? "md:invisible md:group-hover:visible"
-                : ""
+                ? "invisible group-hover:visible md:invisible md:group-hover:visible"
+                : "hidden"
             )}
           >
             {/* Move buttons - only show when reordering is enabled */}
@@ -408,85 +436,82 @@ export function TaskItem({
                   variant="ghost"
                   size="icon"
                   onClick={() => onMoveTask?.(task.id, "up")}
-                  className="h-7 w-7 md:h-8 md:w-8"
+                  className="h-7 w-7"
                 >
-                  <ArrowUp className="h-3 w-3 md:h-4 md:w-4" />
+                  <ArrowUp className="h-3 w-3" />
                   <span className="sr-only">Move Up</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => onMoveTask?.(task.id, "down")}
-                  className="h-7 w-7 md:h-8 md:w-8"
+                  className="h-7 w-7"
                 >
-                  <ArrowDown className="h-3 w-3 md:h-4 md:w-4" />
+                  <ArrowDown className="h-3 w-3" />
                   <span className="sr-only">Move Down</span>
                 </Button>
               </>
             )}
-
-            {!hideTools && (
-              <>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onAddSubtask?.(task.id)}
-                    className="h-7 w-7 md:h-8 md:w-8"
-                  >
-                    <Plus className="h-3 w-3 md:h-4 md:w-4" />
-                    <span className="sr-only">Add Subtask</span>
-                  </Button>
-                )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 md:h-8 md:w-8"
-                    >
-                      <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
-                      <span className="sr-only">More</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={copyTaskToClipboard}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy text
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem
-                        onClick={() => setShowAssignmentDialog(true)}
-                      >
-                        <Users className="mr-2 h-4 w-4" />
-                        Manage Assignments
-                      </DropdownMenuItem>
-                    )}
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => onEditTask?.(task)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                    )}
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => onDeleteTask?.(task.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
           </div>
+
+          {/* Plus and More buttons - always visible */}
+          {!hideTools && (
+            <div className="flex items-center gap-1 ml-auto">
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onAddSubtask?.(task.id)}
+                  className="h-7"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {/* <span className="text-xs">Add</span> */}
+                </Button>
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7">
+                    <MoreVertical className="h-3 w-3 mr-1" />
+                    {/* <span className="text-xs">More</span> */}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={copyTaskToClipboard}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy text
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => setShowAssignmentDialog(true)}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Manage Assignments
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onDeleteTask?.(task.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Render children if expanded */}
-      {expanded && childTasks.length > 0 && (
-        <div className="flex flex-col space-y-2">
-          {childTasks.map((childTask) => (
+      {expanded && visibleChildTasks.length > 0 && (
+        <div className="flex flex-col space-y-2 w-full">
+          {visibleChildTasks.map((childTask) => (
             <TaskItem
               key={childTask.id}
               task={childTask}
@@ -505,6 +530,7 @@ export function TaskItem({
               hideNotAssignedToMe={hideNotAssignedToMe}
               isCheckedIn={isCheckedIn}
               showReorderButtons={showReorderButtons}
+              showCompleted={showCompleted}
             />
           ))}
         </div>

@@ -72,6 +72,7 @@ export function ChecklistComponent({
   const [visibility, setVisibility] = useState<"team" | "private" | "public">(
     "team"
   );
+  const [initialData, setInitialData] = useState<any>(null);
 
   // Fetch checklists for the specific team
   const {
@@ -165,6 +166,11 @@ export function ChecklistComponent({
 
   const onEditTask = (task: ChecklistTask) => {
     setEditingTask(task);
+    setInitialData({
+      id: task.id,
+      title: task.title,
+      parentId: task.parentId,
+    });
     setShowTaskDialog(true);
   };
 
@@ -186,6 +192,7 @@ export function ChecklistComponent({
       await refetch?.();
       setShowTaskDialog(false);
       setEditingTask(null);
+      setInitialData(null);
       toast.success("LongTerm task updated successfully");
       return true;
     } catch (error) {
@@ -348,6 +355,7 @@ export function ChecklistComponent({
             <Button
               onClick={() => {
                 setEditingTask(null);
+                setInitialData(null);
                 setShowTaskDialog(true);
               }}
             >
@@ -407,11 +415,7 @@ export function ChecklistComponent({
               ? "Add Subtask"
               : "Add LongTerm Task"
           }
-          initialData={{
-            id: editingTask?.id || "",
-            title: editingTask?.title || "",
-            parentId: editingTask?.parentId || null,
-          }}
+          initialData={initialData}
           tasks={tasks as any}
           teamId={teamId}
           teamName={teamName}

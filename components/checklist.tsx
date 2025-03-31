@@ -10,6 +10,8 @@ import {
   Globe,
   Lock,
   RefreshCw,
+  EyeIcon,
+  EyeOffIcon,
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { TaskItem } from "./task-item";
@@ -25,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface TeamMember {
   id: string;
@@ -65,9 +68,11 @@ export function ChecklistComponent({
   const [hideTools, setHideTools] = useState(false);
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
   const [showReorderButtons, setShowReorderButtons] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [visibility, setVisibility] = useState<"team" | "private" | "public">(
     "team"
   );
+  const [initialData, setInitialData] = useState<any>(null);
 
   // Fetch checklists for the specific team
   const {
@@ -124,6 +129,16 @@ export function ChecklistComponent({
     .filter((task) => task.parentId === null)
     .sort((a, b) => a.position - b.position);
 
+  // Filter tasks based on showCompleted setting
+  const visibleTasks = showCompleted
+    ? topLevelTasks
+    : topLevelTasks.filter((task) => {
+        const isTaskCompleted = completions?.some(
+          (c: any) => c.taskId === task.id
+        );
+        return !isTaskCompleted;
+      });
+
   const handleAddTask = async (data: {
     title: string;
     parentId: string | null;
@@ -151,6 +166,11 @@ export function ChecklistComponent({
 
   const onEditTask = (task: ChecklistTask) => {
     setEditingTask(task);
+    setInitialData({
+      id: task.id,
+      title: task.title,
+      parentId: task.parentId,
+    });
     setShowTaskDialog(true);
   };
 
@@ -172,6 +192,7 @@ export function ChecklistComponent({
       await refetch?.();
       setShowTaskDialog(false);
       setEditingTask(null);
+      setInitialData(null);
       toast.success("LongTerm task updated successfully");
       return true;
     } catch (error) {
@@ -212,39 +233,40 @@ export function ChecklistComponent({
 
   const handleMoveTask = async (taskId: string, direction: "up" | "down") => {
     if (!isAdmin) return;
-    
+
     try {
       setError(null);
-      const taskToMove = tasks.find(t => t.id === taskId);
+      const taskToMove = tasks.find((t) => t.id === taskId);
       if (!taskToMove) return;
-      
+
       const siblings = tasks
-        .filter(t => t.parentId === taskToMove.parentId)
+        .filter((t) => t.parentId === taskToMove.parentId)
         .sort((a, b) => a.position - b.position);
-      
-      const currentIndex = siblings.findIndex(t => t.id === taskId);
+
+      const currentIndex = siblings.findIndex((t) => t.id === taskId);
       if (currentIndex === -1) return;
-      
-      const targetIndex = direction === "up" 
-        ? Math.max(0, currentIndex - 1) 
-        : Math.min(siblings.length - 1, currentIndex + 1);
-      
+
+      const targetIndex =
+        direction === "up"
+          ? Math.max(0, currentIndex - 1)
+          : Math.min(siblings.length - 1, currentIndex + 1);
+
       if (currentIndex === targetIndex) return;
-      
+
       const targetTask = siblings[targetIndex];
-      
+
       await updateTask.mutateAsync({
         id: taskId,
         position: targetTask.position,
-        teamId
+        teamId,
       });
-      
+
       await updateTask.mutateAsync({
         id: targetTask.id,
         position: taskToMove.position,
-        teamId
+        teamId,
       });
-      
+
       await refetch?.();
     } catch (error) {
       console.error("Failed to move task:", error);
@@ -287,9 +309,28 @@ export function ChecklistComponent({
         </Alert>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <h2 className="text-2xl font-bold">LongTerm Tasks</h2>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(showCompleted && "bg-muted text-muted-foreground")}
+            onClick={() => setShowCompleted(!showCompleted)}
+          >
+            {showCompleted ? (
+              <>
+                <EyeOffIcon className="mr-2 h-4 w-4" />
+                Hide Completed
+              </>
+            ) : (
+              <>
+                <EyeIcon className="mr-2 h-4 w-4" />
+                Show Completed
+              </>
+            )}
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -311,64 +352,32 @@ export function ChecklistComponent({
           </Button>
 
           {isAdmin && (
-            <>
-              {/* <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    {visibility === "team" ? (
-                      <Users className="mr-2 h-4 w-4" />
-                    ) : visibility === "private" ? (
-                      <Lock className="mr-2 h-4 w-4" />
-                    ) : (
-                      <Globe className="mr-2 h-4 w-4" />
-                    )}
-                    {visibility === "team"
-                      ? "Team"
-                      : visibility === "private"
-                      ? "Private"
-                      : "Public"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setVisibility("team")}>
-                    <Users className="mr-2 h-4 w-4" />
-                    Team
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setVisibility("private")}>
-                    <Lock className="mr-2 h-4 w-4" />
-                    Private
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setVisibility("public")}>
-                    <Globe className="mr-2 h-4 w-4" />
-                    Public
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu> */}
-
-              <Button
-                onClick={() => {
-                  setEditingTask(null);
-                  setShowTaskDialog(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
-            </>
+            <Button
+              onClick={() => {
+                setEditingTask(null);
+                setInitialData(null);
+                setShowTaskDialog(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
           )}
         </div>
       </div>
 
       <div className="space-y-2">
-        {!topLevelTasks?.length ? (
+        {!visibleTasks?.length ? (
           <div className="rounded-md border border-dashed p-8 text-center">
             <p className="text-muted-foreground">
-              No LongTerm tasks yet. Click &quot;Add Item&quot; to create one.
+              {!topLevelTasks.length
+                ? 'No LongTerm tasks yet. Click "Add Item" to create one.'
+                : 'No visible tasks. Try enabling "Show Completed" to see completed tasks.'}
             </p>
           </div>
         ) : (
-          <div>
-            {topLevelTasks.map((task) => (
+          <div className="w-full">
+            {visibleTasks.map((task) => (
               <TaskItem
                 key={task.id}
                 task={task as any}
@@ -377,7 +386,7 @@ export function ChecklistComponent({
                 teamMembers={teamMembers}
                 selectedDate="*" // Not date specific
                 onAddSubtask={handleAddSubtask}
-                onEditTask={onEditTask}
+                onEditTask={(task: any) => onEditTask(task)}
                 onDeleteTask={handleDeleteTask}
                 onMoveTask={handleMoveTask}
                 className="mb-2"
@@ -387,6 +396,7 @@ export function ChecklistComponent({
                 hideNotAssignedToMe={showAssignedToMe}
                 isCheckedIn={true} // Always allow checklist completions
                 showReorderButtons={showReorderButtons}
+                showCompleted={showCompleted}
               />
             ))}
           </div>
@@ -405,11 +415,7 @@ export function ChecklistComponent({
               ? "Add Subtask"
               : "Add LongTerm Task"
           }
-          initialData={{
-            id: editingTask?.id || "",
-            title: editingTask?.title || "",
-            parentId: editingTask?.parentId || null,
-          }}
+          initialData={initialData}
           tasks={tasks as any}
           teamId={teamId}
           teamName={teamName}

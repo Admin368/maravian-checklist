@@ -54,6 +54,8 @@ model Task {
   isDeleted   Boolean      @default(false) @map("is_deleted")
   type        String       @default("daily") @map("type") @db.VarChar(50)
   visibility  String       @default("team") @map("visibility") @db.VarChar(50)
+  deadline    DateTime?    @map("deadline") @db.Date
+  time        String?      @db.VarChar(20)
   completions TaskCompletion[]
   assignments TaskAssignment[]
   parent      Task?        @relation("TaskToTask", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)

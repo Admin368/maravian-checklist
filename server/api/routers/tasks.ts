@@ -9,24 +9,20 @@ import { prisma } from "@/lib/prisma";
 
 export const serverGetTasks = async (args: {
   teamId: string;
-  date: string;
+  date?: string;
   type?: string;
   userId?: string;
+  includeDeleted?: boolean;
 }) => {
   const whereClause: any = {
     teamId: args.teamId,
     isDeleted: false,
   };
 
-  // Add type filter if specified
   if (args.type) {
     whereClause.type = args.type;
-  } else {
-    // Default to daily tasks
-    whereClause.type = "daily";
   }
 
-  // For private checklists, filter by userId
   if (args.type === "checklist" && args.userId) {
     whereClause.OR = [
       { visibility: "team" },
@@ -63,37 +59,29 @@ export type serverGetTasksReturnType = Awaited<
 
 export const serverGetCompletions = async (args: {
   teamId: string;
-  date: string;
+  date?: string;
   userId: string;
+  isChecklist?: boolean;
 }) => {
-  return await prisma.taskCompletion.findMany({
-    where: {
-      completionDate: toISODateTime(args.date),
-      task: {
-        team: {
-          members: {
-            some: {
-              userId: args.userId,
-            },
-          },
-        },
-        isDeleted: false,
-      },
+  const whereClause: any = {
+    task: {
+      teamId: args.teamId,
+      isDeleted: false,
     },
+  };
+
+  if (args.isChecklist) {
+    whereClause.completionDate = null;
+  } else if (args.date) {
+    whereClause.completionDate = toISODateTime(args.date);
+  } else {
+    return [];
+  }
+
+  return await prisma.taskCompletion.findMany({
+    where: whereClause,
     include: {
-      task: {
-        include: {
-          team: {
-            include: {
-              members: {
-                include: {
-                  user: true,
-                },
-              },
-            },
-          },
-        },
-      },
+      task: true,
       user: true,
     },
   });
@@ -104,6 +92,36 @@ export type serverGetCompletionsReturnType = Awaited<
 >[number];
 
 export const tasksRouter = router({
+  getById: protectedProcedure
+    .input(z.object({ taskId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const task = await prisma.task.findUnique({
+        where: { id: input.taskId },
+        include: { assignments: true },
+      });
+
+      if (!task)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+      const membership = await prisma.teamMember.findUnique({
+        where: {
+          teamId_userId: {
+            teamId: task.teamId!,
+            userId: ctx.userId!,
+          },
+        },
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this task",
+        });
+      }
+
+      return task;
+    }),
+
   getByTeam: protectedProcedure
     .input(
       z.object({
@@ -113,7 +131,6 @@ export const tasksRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        // First verify the user has access to this team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
             teamId_userId: {
@@ -130,10 +147,11 @@ export const tasksRouter = router({
           });
         }
 
-        // Get tasks with assignments
         const tasks = await serverGetTasks({
           teamId: input.teamId,
           date: input.date,
+          type: "daily",
+          userId: ctx.userId!,
         });
         const teamMembers = await serverGetTeamMembers({
           ctx,
@@ -145,6 +163,7 @@ export const tasksRouter = router({
           teamId: input.teamId,
           date: input.date,
           userId: ctx.userId!,
+          isChecklist: false,
         });
 
         const checkInStatus = await serverGetCheckInStatus({
@@ -168,7 +187,6 @@ export const tasksRouter = router({
 
   getAll: protectedProcedure.query(async ({ ctx }) => {
     try {
-      // Get user's teams
       const memberships = await ctx.prisma.teamMember.findMany({
         where: { userId: ctx.userId },
         select: { teamId: true },
@@ -208,11 +226,12 @@ export const tasksRouter = router({
         position: z.number().optional(),
         type: z.enum(["daily", "checklist"]).default("daily"),
         visibility: z.enum(["team", "private", "public"]).default("team"),
+        deadline: z.string().optional(),
+        time: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Verify user has access to the team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
             teamId_userId: {
@@ -229,7 +248,6 @@ export const tasksRouter = router({
           });
         }
 
-        // If position is not provided, get the max position for the parent and add 1
         let position = input.position;
         if (position === undefined) {
           const lastTask = await ctx.prisma.task.findFirst({
@@ -245,7 +263,19 @@ export const tasksRouter = router({
 
           position = lastTask ? lastTask.position + 1 : 0;
         }
-
+        const deadline_ = input.deadline;
+        const deadline = deadline_
+          ? (() => {
+              const [month, day, year] = deadline_.split("/");
+              return new Date(
+                Date.UTC(
+                  parseInt(year),
+                  parseInt(month) - 1, // months are 0-based in JavaScript
+                  parseInt(day)
+                )
+              );
+            })()
+          : null;
         const task = await ctx.prisma.task.create({
           data: {
             title: input.title,
@@ -254,6 +284,8 @@ export const tasksRouter = router({
             position,
             type: input.type,
             visibility: input.visibility,
+            deadline: deadline,
+            time: input.time,
           },
         });
 
@@ -268,121 +300,69 @@ export const tasksRouter = router({
   update: protectedProcedure
     .input(
       z.object({
-        id: z.string().uuid().optional(),
+        id: z.string().uuid(),
+        teamId: z.string().uuid(),
         title: z.string().min(1).optional(),
         parentId: z.string().uuid().nullable().optional(),
-        teamId: z.string().uuid().optional(),
         position: z.number().optional(),
-        updates: z
-          .array(
-            z.object({
-              id: z.string().uuid(),
-              position: z.number(),
-            })
-          )
-          .optional(),
+        visibility: z.enum(["team", "private", "public"]).optional(),
+        deadline: z.string().optional().nullable(),
+        time: z.string().optional().nullable(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // If this is a batch update
-        if (input.updates) {
-          // Get the first task to check team access
-          const firstTask = await ctx.prisma.task.findUnique({
-            where: { id: input.updates[0].id },
-            select: { teamId: true },
-          });
-
-          if (!firstTask || !firstTask.teamId) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Task not found",
-            });
-          }
-
-          // Verify user has access to the team
-          const membership = await ctx.prisma.teamMember.findUnique({
-            where: {
-              teamId_userId: {
-                teamId: firstTask.teamId,
-                userId: ctx.userId,
-              },
-            },
-          });
-
-          if (!membership) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "You don't have access to this team",
-            });
-          }
-
-          // Update positions in a transaction
-          await ctx.prisma.$transaction(
-            input.updates.map((update) =>
-              ctx.prisma.task.update({
-                where: { id: update.id },
-                data: { position: update.position },
-              })
-            )
-          );
-
-          return { success: true };
-        }
-
-        // Regular single task update
-        if (!input.id) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Task ID is required for single task update",
-          });
-        }
-
-        // Get current task to check team
-        const task = await ctx.prisma.task.findUnique({
-          where: { id: input.id },
-          select: { teamId: true },
-        });
-
-        if (!task || !task.teamId) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Task not found",
-          });
-        }
-
-        // Verify user has access to the team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
-            teamId_userId: {
-              teamId: task.teamId,
-              userId: ctx.userId,
-            },
+            teamId_userId: { teamId: input.teamId, userId: ctx.userId },
           },
         });
 
         if (!membership) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+        }
+
+        const { id, teamId, ...updateDataInput } = input;
+
+        if (updateDataInput.parentId === id) {
           throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You don't have access to this team",
+            code: "BAD_REQUEST",
+            message: "Task cannot be its own parent",
           });
         }
 
-        const updatedTask = await ctx.prisma.task.update({
-          where: { id: input.id },
-          data: {
-            ...(input.title && { title: input.title }),
-            ...(input.parentId !== undefined && { parentId: input.parentId }),
-            ...(input.teamId && { teamId: input.teamId }),
-            ...(input.position !== undefined && { position: input.position }),
-          },
-        });
+        const updatePayload: any = { ...updateDataInput };
+        if (input.hasOwnProperty("deadline")) {
+          const deadline_ = input.deadline;
+          const deadline = deadline_
+            ? (() => {
+                const [month, day, year] = deadline_.split("/");
+                return new Date(
+                  Date.UTC(
+                    parseInt(year),
+                    parseInt(month) - 1, // months are 0-based in JavaScript
+                    parseInt(day)
+                  )
+                );
+              })()
+            : null;
+          updatePayload.deadline = deadline;
+        }
+        if (input.hasOwnProperty("time")) {
+          updatePayload.time = input.time;
+        }
 
+        const updatedTask = await ctx.prisma.task.update({
+          where: { id: id },
+          data: updatePayload,
+        });
         return updatedTask;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
-        console.error("Error updating task:", error);
-        throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update task.",
+        });
       }
     }),
 
@@ -394,7 +374,6 @@ export const tasksRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        // Get current task to check team
         const task = await ctx.prisma.task.findUnique({
           where: { id: input.id },
           select: { teamId: true },
@@ -407,7 +386,6 @@ export const tasksRouter = router({
           });
         }
 
-        // Verify user has access to the team and is an admin
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
             teamId_userId: {
@@ -432,18 +410,15 @@ export const tasksRouter = router({
         }
 
         const softDeleteTaskAndChildren = async (taskId: string) => {
-          // Get all descendant tasks
           const children = await ctx.prisma.task.findMany({
             where: { parentId: taskId },
           });
 
-          // Soft delete the current task
           await ctx.prisma.task.update({
             where: { id: taskId },
             data: { isDeleted: true },
           });
 
-          // Recursively soft delete all children
           for (const child of children) {
             await softDeleteTaskAndChildren(child.id);
           }
@@ -470,7 +445,6 @@ export const tasksRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { taskId, userId, isRemove } = input;
 
-      // Verify user has access to the task
       const task = await ctx.prisma.task.findUnique({
         where: { id: taskId },
         include: { team: true },
@@ -490,7 +464,6 @@ export const tasksRouter = router({
         });
       }
 
-      // Verify user is a member of the team
       const teamMember = await ctx.prisma.teamMember.findUnique({
         where: {
           teamId_userId: {
@@ -507,7 +480,6 @@ export const tasksRouter = router({
         });
       }
 
-      // Verify user is admin
       if (teamMember.role !== "admin" && teamMember.role !== "owner") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -515,7 +487,6 @@ export const tasksRouter = router({
         });
       }
 
-      // Create or update assignment
       if (isRemove) {
         await ctx.prisma.taskAssignment.delete({
           where: {
@@ -555,7 +526,6 @@ export const tasksRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { taskId, userIds, action } = input;
 
-      // Verify user has access to the task
       const task = await ctx.prisma.task.findUnique({
         where: { id: taskId },
         include: {
@@ -579,7 +549,6 @@ export const tasksRouter = router({
         });
       }
 
-      // Verify user is a member of the team
       const teamMember = await ctx.prisma.teamMember.findUnique({
         where: {
           teamId_userId: {
@@ -596,7 +565,6 @@ export const tasksRouter = router({
         });
       }
 
-      // Verify user is admin
       if (teamMember.role !== "admin" && teamMember.role !== "owner") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -604,18 +572,14 @@ export const tasksRouter = router({
         });
       }
 
-      // Get current assignments
       const currentAssignments = task.assignments.map((a) => a.userId);
 
       try {
-        // Handle different actions
         if (action === "set") {
-          // Remove all existing assignments
           await ctx.prisma.taskAssignment.deleteMany({
             where: { taskId },
           });
 
-          // Add all specified assignments
           if (userIds.length > 0) {
             await ctx.prisma.taskAssignment.createMany({
               data: userIds.map((userId) => ({
@@ -626,7 +590,6 @@ export const tasksRouter = router({
             });
           }
         } else if (action === "add") {
-          // Add new assignments
           if (userIds.length > 0) {
             await ctx.prisma.taskAssignment.createMany({
               data: userIds.map((userId) => ({
@@ -637,7 +600,6 @@ export const tasksRouter = router({
             });
           }
         } else if (action === "remove") {
-          // Remove specified assignments
           if (userIds.length > 0) {
             await ctx.prisma.$transaction(
               userIds.map((userId) =>
@@ -671,7 +633,6 @@ export const tasksRouter = router({
     )
     .query(async ({ ctx, input }) => {
       try {
-        // First verify the user has access to this team
         const membership = await ctx.prisma.teamMember.findUnique({
           where: {
             teamId_userId: {
@@ -688,10 +649,9 @@ export const tasksRouter = router({
           });
         }
 
-        // Get checklist tasks with assignments
         const tasks = await serverGetTasks({
           teamId: input.teamId,
-          date: "", // Date is not relevant for checklists
+          date: "",
           type: "checklist",
           userId: ctx.userId!,
         });
@@ -702,19 +662,10 @@ export const tasksRouter = router({
           userId: ctx.userId!,
         });
 
-        // Get completions for checklist items (without date filter)
-        const completions = await ctx.prisma.taskCompletion.findMany({
-          where: {
-            task: {
-              teamId: input.teamId,
-              type: "checklist",
-              isDeleted: false,
-            },
-          },
-          include: {
-            task: true,
-            user: true,
-          },
+        const completions = await serverGetCompletions({
+          teamId: input.teamId,
+          userId: ctx.userId!,
+          isChecklist: true,
         });
 
         return {
@@ -725,7 +676,10 @@ export const tasksRouter = router({
       } catch (error) {
         console.error("Error fetching checklists:", error);
         if (error instanceof TRPCError) throw error;
-        return null;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch checklists",
+        });
       }
     }),
 });

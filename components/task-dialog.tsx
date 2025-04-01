@@ -21,21 +21,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, CalendarIcon, Clock, X } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import TimePicker from "./timePicker";
 
 interface TaskDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: { title: string; parentId: string | null }) => void;
+  onSubmit: (data: {
+    title: string;
+    parentId: string | null;
+    deadline?: Date | null;
+    time?: string | null;
+  }) => void;
   title: string;
   initialData?: {
     id: string;
     title: string;
     parentId: string | null;
+    deadline?: Date | null;
+    time?: string | null;
   };
   tasks: any[];
   teamId: string;
   teamName?: string;
+  showDeadline?: boolean;
 }
 
 export function TaskDialog({
@@ -47,58 +64,53 @@ export function TaskDialog({
   tasks,
   teamId,
   teamName,
+  showDeadline = false,
 }: TaskDialogProps) {
   const [taskTitle, setTaskTitle] = useState(initialData?.title || "");
   const [parentId, setParentId] = useState<string | null>(
     initialData?.parentId || null
   );
+  const [deadline, setDeadline] = useState<Date | null>(
+    initialData?.deadline || null
+  );
+  const [time, setTime] = useState<string | null>(initialData?.time || null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [didInitialize, setDidInitialize] = useState(false);
 
   useEffect(() => {
-    // Only update the form when initialData changes and dialog is first opened
-    // or when editing a different task
     if (
       initialData &&
       open &&
       (!didInitialize || initialData.id !== parentId)
     ) {
-      // If it has a parentId, set it (used when adding subtasks)
       if (initialData.parentId) {
         setParentId(initialData.parentId);
       } else {
         setParentId(null);
       }
 
-      // If it has a title and we're editing, set it
-      if (initialData.id && initialData.title) {
-        setTaskTitle(initialData.title);
-      } else if (!didInitialize) {
-        // For new tasks, reset the title only on first initialization
-        setTaskTitle("");
-      }
+      // if (initialData.id && initialData.title) {
+      // } else if (!didInitialize) {
+      //   setTaskTitle("");
+      //   setDeadline(null);
+      //   setTime(null);
+      // }
+      setTaskTitle(initialData.title || "");
+      setDeadline(initialData.deadline || null);
+      setTime(initialData.time || null);
 
-      // Reset error and submission state
       setError("");
       setIsSubmitting(false);
       setDidInitialize(true);
     }
   }, [initialData, open, didInitialize, parentId]);
 
-  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setDidInitialize(false);
     }
   }, [open]);
-
-  // Add logging to see what's happening
-  useEffect(() => {
-    if (initialData?.parentId) {
-      const parent = tasks.find((t) => t.id === initialData.parentId);
-    }
-  }, [initialData, tasks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,9 +126,9 @@ export function TaskDialog({
       await onSubmit({
         title: taskTitle,
         parentId,
+        deadline,
+        time,
       });
-
-      // Don't reset form here - it will be reset when dialog closes or reopens
     } catch (error) {
       console.error("Error submitting task:", error);
       setError("Failed to save task. Please try again.");
@@ -173,10 +185,7 @@ export function TaskDialog({
                 onValueChange={(value) =>
                   setParentId(value === "none" ? null : value)
                 }
-                disabled={
-                  // isSubmitting || !!(initialData?.parentId && !initialData?.id)
-                  isSubmitting
-                }
+                disabled={isSubmitting}
               >
                 <SelectTrigger id="parent" className="col-span-3">
                   <SelectValue>
@@ -189,7 +198,7 @@ export function TaskDialog({
                 <SelectContent>
                   <SelectItem value="none">None (Top Level)</SelectItem>
                   {tasks
-                    .filter((t) => t.id !== initialData?.id) // Prevent selecting self as parent
+                    .filter((t) => t.id !== initialData?.id)
                     .map((task) => (
                       <SelectItem key={task.id} value={task.id}>
                         {task.title}
@@ -198,6 +207,57 @@ export function TaskDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Deadline Picker */}
+            {showDeadline && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deadline" className="text-right">
+                  Deadline
+                </Label>
+                <div className="col-span-3 flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !deadline && "text-muted-foreground"
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {deadline ? format(deadline, "PPP") : "Set deadline"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={deadline || undefined}
+                        onSelect={(value) => setDeadline(value || null)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setDeadline(null)}
+                    disabled={isSubmitting || !deadline}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Time Picker */}
+            <TimePicker
+              initialTime={initialData?.time || undefined}
+              onChange={(time) => setTime(time || null)}
+              disabled={isSubmitting}
+            />
 
             {error && (
               <p className="text-sm text-red-500 text-right">{error}</p>

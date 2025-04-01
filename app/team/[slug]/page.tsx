@@ -1,18 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { TaskList } from "@/components/task-list";
 import { api } from "@/lib/trpc/client";
-import {
-  Loader2,
-  ExternalLink,
-  Copy,
-  Trash2,
-  Ban,
-  Settings,
-  Plus,
-} from "lucide-react";
+import { Loader2, ExternalLink, Copy, Trash2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckInStatusBar } from "@/components/check-in-status-bar";
@@ -34,17 +26,18 @@ import { UserList } from "@/components/user-list";
 import { useSession } from "next-auth/react";
 import { CheckoutDialog } from "@/components/checkout-dialog";
 import { format } from "date-fns";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/date-picker";
 import { CloneTeamButton } from "@/components/clone-team-button";
 import { ChecklistComponent } from "@/components/checklist";
 
 export default function TeamPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") as string;
   const router = useRouter();
   const slug = params?.slug as string;
   const [teamLoaded, setTeamLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState("tasks");
+  const [activeTab, setActiveTab] = useState(tab ?? "tasks");
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const today = format(new Date(), "yyyy-MM-dd");
@@ -113,7 +106,6 @@ export default function TeamPage() {
   );
   // const isCheckedIn = checkIns?.some((checkIn) => checkIn.userId === userId);
   const checkIn = checkIns?.find((checkIn) => checkIn.userId === userId);
-  console.log(checkIn);
   const isCheckedIn = checkIn ? true : false;
   // Get current user's role
   const currentUserRole = teamMembers?.find(
@@ -287,43 +279,65 @@ export default function TeamPage() {
             <TabsList className="w-full max-w-md mx-auto mb-4 sm:mb-8 overflow-hidden flex flex-wrap gap-1">
               <TabsTrigger
                 value="tasks"
-                onClick={() => setActiveTab("tasks")}
+                onClick={() => {
+                  setActiveTab("tasks");
+                  router.push(`/team/${slug}?tab=tasks`, { scroll: false });
+                }}
                 className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Recurring
               </TabsTrigger>
               <TabsTrigger
                 value="checklists"
-                onClick={() => setActiveTab("checklists")}
+                onClick={() => {
+                  setActiveTab("checklists");
+                  router.push(`/team/${slug}?tab=checklists`, {
+                    scroll: false,
+                  });
+                }}
                 className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 LongTerm
               </TabsTrigger>
               <TabsTrigger
                 value="members"
-                onClick={() => setActiveTab("members")}
+                onClick={() => {
+                  setActiveTab("members");
+                  router.push(`/team/${slug}?tab=members`, { scroll: false });
+                }}
                 className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Members
               </TabsTrigger>
               <TabsTrigger
                 value="check-ins"
-                onClick={() => setActiveTab("check-ins")}
+                onClick={() => {
+                  setActiveTab("check-ins");
+                  router.push(`/team/${slug}?tab=check-ins`, { scroll: false });
+                }}
                 className="flex-grow basis-auto text-xs sm:text-sm px-1 sm:px-3"
               >
                 Check-ins
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="tasks" className="mt-0">
+            <TabsContent value="tasks" className="mt-0 min-h-[1000px]">
               <div className="flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                   <div className="flex flex-col mb-4">
+                    <h2 className="text-2xl font-bold">
+                      {team.name}
+                      <br />
+                      RECURRING TASKS
+                    </h2>
                     <p className="text-sm text-muted-foreground mb-4">
                       {`Daily recurring tasks that happen frequently and are
                       tracked separately for each day. When completed, they're
                       recorded for the specific date selected.`}
                     </p>
+                    <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4">
+                      Tasks for:
+                    </h2>
                     <DatePicker
                       date={selectedDate}
                       onDateChange={setSelectedDate}
@@ -343,10 +357,6 @@ export default function TeamPage() {
                 </div>
 
                 <div className="mt-4">
-                  <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4">
-                    Tasks for {format(selectedDate, "MMM d, yyyy")}
-                  </h2>
-
                   <TaskList
                     teamId={team.id}
                     teamName={team.name}
@@ -356,10 +366,12 @@ export default function TeamPage() {
               </div>
             </TabsContent>
 
-            <TabsContent
-              value="checklists"
-              className="space-y-4 sm:space-y-6 mt-0"
-            >
+            <TabsContent value="checklists" className="min-h-[1000px]">
+              <h2 className="text-2xl font-bold">
+                {team.name}
+                <br />
+                LONGTERM TASKS
+              </h2>
               <p className="text-sm text-muted-foreground mb-4">
                 Long-term tasks represent ongoing responsibilities or one-time
                 activities that persist over time. When completed, they remain
@@ -374,7 +386,7 @@ export default function TeamPage() {
 
             <TabsContent
               value="members"
-              className="space-y-4 sm:space-y-6 mt-0"
+              className="space-y-4 sm:space-y-6 mt-0 min-h-[1000px]"
             >
               <UserList
                 teamId={team?.id || ""}
@@ -385,7 +397,7 @@ export default function TeamPage() {
 
             <TabsContent
               value="check-ins"
-              className="space-y-4 sm:space-y-6 mt-0 px-0 sm:px-4"
+              className="space-y-4 sm:space-y-6 mt-0 px-0 sm:px-4 min-h-[1000px]"
             >
               <CheckInsPage />
             </TabsContent>

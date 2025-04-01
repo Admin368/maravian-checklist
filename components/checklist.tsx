@@ -6,12 +6,10 @@ import {
   Plus,
   Users,
   AlertTriangle,
-  Loader2,
-  Globe,
-  Lock,
   RefreshCw,
   EyeIcon,
   EyeOffIcon,
+  CalendarIcon,
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
 import { TaskItem } from "./task-item";
@@ -20,14 +18,11 @@ import { useUser } from "./user-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { isToday, startOfDay } from "date-fns";
 
 interface TeamMember {
   id: string;
@@ -48,6 +43,7 @@ type ChecklistTask = {
   isDeleted: boolean;
   type: string;
   visibility: string;
+  deadline?: Date | null;
   assignments: { userId: string }[];
 };
 
@@ -69,10 +65,11 @@ export function ChecklistComponent({
   const [showAssignedToMe, setShowAssignedToMe] = useState(false);
   const [showReorderButtons, setShowReorderButtons] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showTodayOnly, setShowTodayOnly] = useState(false);
   const [visibility, setVisibility] = useState<"team" | "private" | "public">(
     "team"
   );
-  const [initialData, setInitialData] = useState<any>(null);
+  // const [initialData, setInitialData] = useState<any>(null);
 
   // Fetch checklists for the specific team
   const {
@@ -96,10 +93,11 @@ export function ChecklistComponent({
   const teamMembers = data?.teamMembers || [];
   const completions = data?.completions || [];
 
-  // Ensure tasks have the correct structure
+  // Ensure tasks have the correct structure including deadline
   const tasks: ChecklistTask[] = (data?.tasks || []).map((task: any) => ({
     ...task,
     assignments: task.assignments || [],
+    deadline: task.deadline ? new Date(task.deadline) : null,
   }));
 
   // Mutations
@@ -108,12 +106,18 @@ export function ChecklistComponent({
       console.error("Error creating LongTerm task:", err);
       setError("Failed to create LongTerm task. Please try again.");
     },
+    onSuccess: () => {
+      refetch?.();
+    },
   });
 
   const updateTask = api.tasks.update.useMutation({
     onError: (err) => {
       console.error("Error updating LongTerm task:", err);
       setError("Failed to update LongTerm task. Please try again.");
+    },
+    onSuccess: () => {
+      refetch?.();
     },
   });
 
@@ -122,6 +126,9 @@ export function ChecklistComponent({
       console.error("Error deleting LongTerm task:", err);
       setError("Failed to delete LongTerm task. Please try again.");
     },
+    onSuccess: () => {
+      refetch?.();
+    },
   });
 
   // Get top-level tasks
@@ -129,21 +136,45 @@ export function ChecklistComponent({
     .filter((task) => task.parentId === null)
     .sort((a, b) => a.position - b.position);
 
-  // Filter tasks based on showCompleted setting
-  const visibleTasks = showCompleted
-    ? topLevelTasks
-    : topLevelTasks.filter((task) => {
-        const isTaskCompleted = completions?.some(
-          (c: any) => c.taskId === task.id
-        );
-        return !isTaskCompleted;
-      });
+  // Filter tasks based on showCompleted and showTodayOnly settings
+  const visibleTasks = topLevelTasks
+    .filter((task) => {
+      if (showCompleted) {
+        return true;
+      }
+      const isTaskCompleted = completions?.some(
+        (c: any) => c.taskId === task.id
+      );
+      return !isTaskCompleted;
+    })
+    .filter((task) => {
+      if (!showTodayOnly) {
+        return true;
+      }
+      if (!task.deadline) {
+        return false;
+      }
+      // Convert UTC deadline to local time for comparison
+      const taskDeadline = new Date(task.deadline);
+      return isToday(taskDeadline);
+    });
 
   const handleAddTask = async (data: {
     title: string;
     parentId: string | null;
+    deadline?: Date | null;
+    time?: string | null;
   }) => {
     if (!isAdmin) return;
+
+    // Set deadline based on Today Mode or passed deadline
+    let taskDeadline: string | undefined;
+
+    if (data.deadline) {
+      const date = data.deadline?.toLocaleDateString();
+      taskDeadline = date;
+    }
+
     try {
       setError(null);
       await createTask.mutateAsync({
@@ -152,9 +183,10 @@ export function ChecklistComponent({
         teamId,
         type: "checklist",
         visibility,
+        deadline: taskDeadline,
+        time: data.time || undefined,
       });
 
-      await refetch?.();
       setShowTaskDialog(false);
       toast.success("LongTerm task created successfully");
       return true;
@@ -166,19 +198,29 @@ export function ChecklistComponent({
 
   const onEditTask = (task: ChecklistTask) => {
     setEditingTask(task);
-    setInitialData({
-      id: task.id,
-      title: task.title,
-      parentId: task.parentId,
-    });
+    // setInitialData({
+    //   id: task.id,
+    //   title: task.title,
+    //   parentId: task.parentId,
+    //   deadline: task.deadline, // Include deadline in initial data
+    // });
     setShowTaskDialog(true);
   };
 
   const handleEditTask = async (data: {
     title: string;
     parentId: string | null;
+    deadline?: Date | null;
+    time?: string | null;
   }) => {
     if (!isAdmin || !editingTask) return;
+
+    let taskDeadline: string | undefined;
+
+    if (data.deadline) {
+      const date = data.deadline?.toLocaleDateString();
+      taskDeadline = date;
+    }
 
     try {
       setError(null);
@@ -187,12 +229,13 @@ export function ChecklistComponent({
         title: data.title,
         parentId: data.parentId,
         teamId,
+        deadline: taskDeadline, // Include deadline in update
+        time: data.time,
       });
 
-      await refetch?.();
       setShowTaskDialog(false);
       setEditingTask(null);
-      setInitialData(null);
+      // setInitialData(null);
       toast.success("LongTerm task updated successfully");
       return true;
     } catch (error) {
@@ -210,7 +253,6 @@ export function ChecklistComponent({
         id: taskId,
       });
 
-      await refetch?.();
       toast.success("LongTerm task deleted successfully");
     } catch (error) {
       console.error("Failed to delete LongTerm task:", error);
@@ -267,10 +309,10 @@ export function ChecklistComponent({
         teamId,
       });
 
-      await refetch?.();
+      toast.success("LongTerm task reordered successfully");
     } catch (error) {
-      console.error("Failed to move task:", error);
-      setError("Failed to reorder tasks. Please try again.");
+      console.error("Failed to reorder task:", error);
+      setError("Failed to reorder task. Please try again.");
     }
   };
 
@@ -308,10 +350,23 @@ export function ChecklistComponent({
           </Button>
         </Alert>
       )}
-
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <h2 className="text-2xl font-bold">LongTerm Tasks</h2>
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="today-only-mode"
+              checked={showTodayOnly}
+              onCheckedChange={setShowTodayOnly}
+              aria-label="Toggle today only mode"
+            />
+            <Label
+              htmlFor="today-only-mode"
+              className="flex items-center gap-1 text-sm"
+            >
+              <CalendarIcon className="h-4 w-4" /> Today Only
+            </Label>
+          </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -354,8 +409,15 @@ export function ChecklistComponent({
           {isAdmin && (
             <Button
               onClick={() => {
-                setEditingTask(null);
-                setInitialData(null);
+                const today = startOfDay(new Date());
+                if (showTodayOnly === true) {
+                  setEditingTask({
+                    deadline: today,
+                  });
+                } else {
+                  setEditingTask(null);
+                }
+                // setInitialData(null);
                 setShowTaskDialog(true);
               }}
             >
@@ -370,9 +432,11 @@ export function ChecklistComponent({
         {!visibleTasks?.length ? (
           <div className="rounded-md border border-dashed p-8 text-center">
             <p className="text-muted-foreground">
-              {!topLevelTasks.length
+              {showTodayOnly
+                ? 'No tasks due today. Try turning off "Today Only" mode.'
+                : !topLevelTasks.length
                 ? 'No LongTerm tasks yet. Click "Add Item" to create one.'
-                : 'No visible tasks. Try enabling "Show Completed" to see completed tasks.'}
+                : 'No tasks match the current filters (e.g., check "Show Completed").'}
             </p>
           </div>
         ) : (
@@ -384,7 +448,7 @@ export function ChecklistComponent({
                 tasks={tasks as any}
                 completions={completions as any}
                 teamMembers={teamMembers}
-                selectedDate="*" // Not date specific
+                selectedDate="*"
                 onAddSubtask={handleAddSubtask}
                 onEditTask={(task: any) => onEditTask(task)}
                 onDeleteTask={handleDeleteTask}
@@ -394,7 +458,7 @@ export function ChecklistComponent({
                 isAdmin={isAdmin}
                 hideTools={hideTools}
                 hideNotAssignedToMe={showAssignedToMe}
-                isCheckedIn={true} // Always allow checklist completions
+                isCheckedIn={true}
                 showReorderButtons={showReorderButtons}
                 showCompleted={showCompleted}
               />
@@ -415,10 +479,11 @@ export function ChecklistComponent({
               ? "Add Subtask"
               : "Add LongTerm Task"
           }
-          initialData={initialData}
+          initialData={editingTask}
           tasks={tasks as any}
           teamId={teamId}
           teamName={teamName}
+          showDeadline={true}
         />
       )}
 

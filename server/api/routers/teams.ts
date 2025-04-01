@@ -150,8 +150,6 @@ export const teamsRouter = router({
           });
         }
 
-        console.log("Team from database:", team);
-
         const teamMembers = await serverGetTeamMembers({
           ctx,
           teamId: team.id,

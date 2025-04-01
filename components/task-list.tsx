@@ -7,14 +7,12 @@ import {
   Plus,
   Users,
   AlertTriangle,
-  Loader2,
   RefreshCw,
   ArrowUpDown,
   EyeIcon,
   EyeOffIcon,
 } from "lucide-react";
 import { api } from "@/lib/trpc/client";
-import { DatePicker } from "./date-picker";
 import { TaskItem } from "./task-item";
 import { TaskDialog } from "./task-dialog";
 import { useUser } from "./user-provider";
@@ -23,7 +21,6 @@ import { UserList } from "./user-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Task } from "@prisma/client";
 import { cn } from "@/lib/utils";
-import { ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { UserCircle } from "lucide-react";
 
@@ -39,10 +36,12 @@ export function TaskList({
   teamId,
   teamName,
   isAdmin = false,
+  focusOnTask,
 }: {
   teamId: string;
   teamName: string;
   isAdmin?: boolean;
+  focusOnTask?: Task;
 }) {
   const { userId, userName } = useUser();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -125,6 +124,7 @@ export function TaskList({
   const handleAddTask = async (data: {
     title: string;
     parentId: string | null;
+    time?: string | null;
   }) => {
     if (!isAdmin) return;
     try {
@@ -133,6 +133,7 @@ export function TaskList({
         title: data.title,
         parentId: data.parentId,
         teamId,
+        time: data.time || undefined,
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
@@ -153,6 +154,7 @@ export function TaskList({
   const handleEditTask = async (data: {
     title: string;
     parentId: string | null;
+    time?: string | null;
   }) => {
     if (!isAdmin || !editingTask) return;
 
@@ -160,8 +162,10 @@ export function TaskList({
       setError(null);
       await updateTask.mutateAsync({
         id: editingTask.id,
+        teamId,
         title: data.title,
         parentId: data.parentId,
+        time: data.time,
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });
@@ -250,13 +254,13 @@ export function TaskList({
       }));
 
       // Update task positions in batch
-      await updateTask.mutateAsync({
-        updates: updates.map((update) => ({
-          ...update,
+      for (const update of updates) {
+        await updateTask.mutateAsync({
+          id: update.id,
+          teamId,
           position: update.position || 0,
-        })),
-        teamId,
-      });
+        });
+      }
 
       // Invalidate tasks query to refresh the list
       // utils.tasks.getByTeam.invalidate({ teamId });
@@ -339,7 +343,7 @@ export function TaskList({
               ) : (
                 <>
                   <EyeIcon className="h-4 w-4" />
-                  <span className="hidden md:inline">Show Completed</span>
+                  <span>Show Completed</span>
                 </>
               )}
             </Button>
@@ -349,22 +353,6 @@ export function TaskList({
             selectedDate={selectedDate}
             onDateChange={handleDateChange}
           /> */}
-
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditingTask(null);
-                setShowTaskDialog(true);
-              }}
-              className="flex-shrink-0"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-          )}
-
           <Button
             variant="outline"
             size="sm"
@@ -377,7 +365,7 @@ export function TaskList({
           </Button>
 
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => refetch?.()}
             className="flex-shrink-0"
@@ -399,9 +387,7 @@ export function TaskList({
               className="flex-shrink-0"
             >
               <UserCircle className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">
-                {showAssignedToMe ? "Show All" : "Assigned to Me"}
-              </span>
+              <span>{showAssignedToMe ? "Show All" : "Assigned to Me"}</span>
             </Button>
           )}
 
@@ -413,9 +399,21 @@ export function TaskList({
               className="flex-shrink-0"
             >
               <ArrowUpDown className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">
-                {showReorderButtons ? "Hide Order" : "Reorder"}
-              </span>
+              <span>{showReorderButtons ? "Hide Order" : "Reorder"}</span>
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingTask(null);
+                setShowTaskDialog(true);
+              }}
+              className="flex-shrink-0"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
             </Button>
           )}
         </div>
@@ -486,28 +484,34 @@ export function TaskList({
       {/* Task list */}
       {!isLoading && visibleTasks.length > 0 && (
         <div className="space-y-2 w-full px-1">
-          {visibleTasks.map((task: Task) => (
-            <TaskItem
-              key={task.id}
-              task={task as any}
-              tasks={tasks as any}
-              completions={completions as any}
-              teamMembers={teamMembers as any}
-              selectedDate={formattedDate}
-              onAddSubtask={handleAddSubtask}
-              onEditTask={onEditTask}
-              onDeleteTask={handleDeleteTask}
-              onMoveTask={handleMoveTask}
-              refetch={refetch as any}
-              isAdmin={isAdmin}
-              hideTools={hideTools}
-              hideNotAssignedToMe={showAssignedToMe}
-              isCheckedIn={checkInStatus?.checkedIn || false}
-              showReorderButtons={showReorderButtons}
-              showCompleted={showCompleted}
-              className="w-full"
-            />
-          ))}
+          {visibleTasks.map((task: Task) =>
+            focusOnTask &&
+            focusOnTask.id !== task.id &&
+            task.id !== focusOnTask.parentId ? undefined : (
+              <TaskItem
+                focusOnTaskId={focusOnTask?.id}
+                key={task.id}
+                task={task as any}
+                tasks={tasks as any}
+                completions={completions as any}
+                teamMembers={teamMembers as any}
+                selectedDate={formattedDate}
+                onAddSubtask={handleAddSubtask}
+                onEditTask={onEditTask}
+                onDeleteTask={handleDeleteTask}
+                onMoveTask={handleMoveTask}
+                refetch={refetch as any}
+                isAdmin={isAdmin}
+                hideTools={hideTools}
+                hideNotAssignedToMe={showAssignedToMe}
+                isCheckedIn={checkInStatus?.checkedIn || false}
+                showReorderButtons={showReorderButtons}
+                setShowReorderButtons={setShowReorderButtons}
+                showCompleted={showCompleted}
+                className="w-full"
+              />
+            )
+          )}
         </div>
       )}
 

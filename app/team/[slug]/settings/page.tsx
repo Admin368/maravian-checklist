@@ -222,9 +222,7 @@ export default function TeamSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardFooter>
-            <Button onClick={() => router.push(`/team/${slug}`)}>
-              Back to Team
-            </Button>
+            <Button onClick={() => router.push(`/team/${slug}`)}>Back</Button>
           </CardFooter>
         </Card>
       </div>

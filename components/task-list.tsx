@@ -139,11 +139,13 @@ export function TaskList({
     if (!isAdmin) return;
     try {
       setError(null);
+      const parentTask = tasks?.find((t: Task) => t.id === data.parentId);
       await createTask.mutateAsync({
         title: data.title,
         parentId: data.parentId,
         teamId,
         time: data.time || undefined,
+        type: parentTask ? (parentTask?.type as any) || "task" : undefined,
       });
 
       // utils.tasks.getByTeam.invalidate({ teamId });

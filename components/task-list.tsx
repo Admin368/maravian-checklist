@@ -36,7 +36,7 @@ interface TeamMember {
 export function TaskList({
   teamId,
   teamName,
-  isAdmin = false,
+  isAdmin,
   focusOnTask,
   taskType,
 }: {
@@ -80,6 +80,13 @@ export function TaskList({
   );
 
   const { teamMembers, completions, tasks, checkInStatus } = data || {};
+  const currentUserRole = teamMembers?.find(
+    (member: any) => member.id === userId
+  )?.role;
+  const isAdmin_ = currentUserRole === "admin";
+  if (isAdmin === undefined) {
+    isAdmin = isAdmin_;
+  }
 
   // Mutations
   const createTask = api.tasks.create.useMutation({
@@ -394,7 +401,7 @@ export function TaskList({
             </Button>
           )}
 
-          {isAdmin && (
+          {/* {isAdmin && (
             <Button
               variant={showReorderButtons ? "default" : "outline"}
               size="sm"
@@ -404,19 +411,25 @@ export function TaskList({
               <ArrowUpDown className="h-4 w-4 mr-2" />
               <span>{showReorderButtons ? "Hide Order" : "Reorder"}</span>
             </Button>
-          )}
+          )} */}
           {isAdmin && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setEditingTask(null);
+                if (focusOnTask) {
+                  setEditingTask({
+                    parentId: focusOnTask.id,
+                    title: "",
+                  });
+                }
                 setShowTaskDialog(true);
               }}
               className="flex-shrink-0"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Task
+              {focusOnTask ? "Add Subtask" : "Add Task"}
             </Button>
           )}
         </div>

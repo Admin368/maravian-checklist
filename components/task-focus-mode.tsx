@@ -342,7 +342,7 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
           teamId={taskData.teamId!}
           // teamName={"Task: " + taskData.title}
           teamName={""}
-          isAdmin={false}
+          // isAdmin={false}
           focusOnTask={taskData}
           taskType={TaskType.ALL}
         />

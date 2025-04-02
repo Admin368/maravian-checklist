@@ -388,7 +388,7 @@ export function TaskItem(props: TaskItemProps) {
             <div className="flex flex-col items-start flex-wrap">
               <span
                 className={cn(
-                  "text-sm break-words pr-1 w-full",
+                  "text-sm break-words pr-1 w-full cursor-pointer hover:underline",
                   isCompleted && "line-through text-muted-foreground"
                 )}
                 onClick={handleOnFocus}
@@ -530,7 +530,7 @@ export function TaskItem(props: TaskItemProps) {
                     <Copy className="mr-2 h-4 w-4" />
                     Copy text
                   </DropdownMenuItem>
-                  <DropdownMenuItem
+                  {/* <DropdownMenuItem
                     hidden={setShowReorderButtons ? true : false}
                     onClick={() => setShowReorderButtons?.(!showReorderButtons)}
                   >
@@ -538,7 +538,7 @@ export function TaskItem(props: TaskItemProps) {
                     {showReorderButtons
                       ? "Hide Reorder Buttons"
                       : "Show Reorder Buttons"}
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
                   {isAdmin && (
                     <DropdownMenuItem
                       onClick={() => setShowAssignmentDialog(true)}

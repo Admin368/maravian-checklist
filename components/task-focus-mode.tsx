@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 // import { formatTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { TaskList } from "./task-list";
+import { TaskType } from "@/types/task";
 
 interface TaskFocusModeProps {
   taskId: string;
@@ -34,6 +35,9 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
   const [hours, setHours] = useState("0");
   const [minutes, setMinutes] = useState("25");
   const [seconds, setSeconds] = useState("0");
+  const [isAlarmOn, setIsAlarmOn] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
 
   // Fetch task data
   const {
@@ -47,6 +51,66 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
     }
   );
 
+  // Initialize audio context
+  useEffect(() => {
+    audioContextRef.current = new AudioContext();
+    return () => {
+      if (oscillatorRef.current) {
+        oscillatorRef.current.stop();
+      }
+    };
+  }, []);
+
+  const playAlarm = () => {
+    if (!audioContextRef.current) return;
+
+    const oscillator = audioContextRef.current.createOscillator();
+    const gainNode = audioContextRef.current.createGain();
+    const lfo = audioContextRef.current.createOscillator();
+    const lfoGain = audioContextRef.current.createGain();
+
+    // Connect the audio nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContextRef.current.destination);
+    lfo.connect(lfoGain);
+    lfoGain.connect(gainNode.gain);
+
+    // Set up the main tone
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(
+      200,
+      audioContextRef.current.currentTime
+    ); // A4 note
+
+    // Set up the LFO for beeping effect
+    lfo.type = "sine";
+    lfo.frequency.setValueAtTime(0.5, audioContextRef.current.currentTime); // 2 beeps per second
+    lfoGain.gain.setValueAtTime(0.1, audioContextRef.current.currentTime); // Moderate modulation
+    gainNode.gain.setValueAtTime(0.01, audioContextRef.current.currentTime); // Lower overall volume
+
+    // Start both oscillators
+    oscillator.start();
+    lfo.start();
+
+    // Store oscillator to stop it later
+    oscillatorRef.current = oscillator;
+  };
+
+  const stopAlarm = () => {
+    if (oscillatorRef.current) {
+      oscillatorRef.current.stop();
+      oscillatorRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (isAlarmOn) {
+      playAlarm();
+    } else {
+      stopAlarm();
+    }
+  }, [isAlarmOn]);
+
   // Timer logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -59,6 +123,7 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
           setTime((prevTime) => {
             if (prevTime <= 0) {
               setIsRunning(false);
+              setIsAlarmOn(true);
               toast.info("Time's up!", {
                 description: "Your countdown timer has finished.",
               });
@@ -70,7 +135,10 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
       }, 1000);
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      setIsAlarmOn(false);
+    };
   }, [isRunning, timerMode]);
 
   // Update countdown time when input values change
@@ -82,7 +150,13 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
   };
 
   const handleTimeInput = (value: string, setter: (value: string) => void) => {
-    const numValue = value === "" ? "0" : value.replace(/[^\d]/g, "");
+    console.log(value);
+    //if value is 3 digits and first is 0, remove the 0
+    let numValue = value;
+    if (value.length === 3) {
+      numValue = value.slice(1);
+    }
+    numValue = numValue === "" ? "0" : numValue.replace(/[^\d]/g, "");
     setter(numValue);
   };
 
@@ -90,12 +164,19 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
     if (timerMode === "countdown" && !isRunning && time === 0) {
       setTime(countdownTime);
     }
+    setIsAlarmOn(false);
     setIsRunning(!isRunning);
+    // if (!isRunning && timerMode === "countdown" && time === 0) {
+    //   setIsAlarmOn(true);
+    // } else {
+    //   setIsAlarmOn(false);
+    // }
   };
 
   const handleReset = () => {
     setIsRunning(false);
     setTime(timerMode === "countdown" ? countdownTime : 0);
+    setIsAlarmOn(false);
   };
 
   const handleModeToggle = () => {
@@ -106,6 +187,7 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
     } else {
       setTime(0);
     }
+    setIsAlarmOn(false);
   };
 
   if (isLoading) {
@@ -135,46 +217,63 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
       <Card className="p-6">
         <div className="flex flex-col items-center space-y-4">
           {timerMode === "countdown" && !isRunning && (
-            <div className="flex gap-2 items-center mb-4">
-              <div className="flex flex-col items-center">
-                <Input
-                  type="text"
-                  value={hours}
-                  onChange={(e) => handleTimeInput(e.target.value, setHours)}
-                  className="w-16 text-center"
-                  maxLength={2}
-                />
-                <span className="text-sm text-muted-foreground">Hours</span>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-2 items-center mb-4 w-full max-w-sm mx-auto">
+              <div className="grid grid-cols-3 gap-2 w-full sm:flex sm:items-center">
+                <div className="flex flex-col items-center">
+                  <Input
+                    type="text"
+                    value={hours}
+                    onChange={(e) => handleTimeInput(e.target.value, setHours)}
+                    className="w-full text-center h-12 text-lg"
+                    maxLength={3}
+                  />
+                  <span className="text-sm text-muted-foreground mt-1">
+                    Hours
+                  </span>
+                </div>
+                {/* <span className="text-2xl self-start mt-3">:</span> */}
+                <div className="flex flex-col items-center">
+                  <Input
+                    type="text"
+                    value={minutes}
+                    onChange={(e) =>
+                      handleTimeInput(e.target.value, setMinutes)
+                    }
+                    className="w-full text-center h-12 text-lg"
+                    maxLength={3}
+                  />
+                  <span className="text-sm text-muted-foreground mt-1">
+                    Minutes
+                  </span>
+                </div>
+                {/* <span className="text-2xl self-start mt-3">:</span> */}
+                <div className="flex flex-col items-center">
+                  <Input
+                    type="text"
+                    value={seconds}
+                    onChange={(e) =>
+                      handleTimeInput(e.target.value, setSeconds)
+                    }
+                    className="w-full text-center h-12 text-lg"
+                    maxLength={3}
+                  />
+                  <span className="text-sm text-muted-foreground mt-1">
+                    Seconds
+                  </span>
+                </div>
               </div>
-              <span className="text-2xl">:</span>
-              <div className="flex flex-col items-center">
-                <Input
-                  type="text"
-                  value={minutes}
-                  onChange={(e) => handleTimeInput(e.target.value, setMinutes)}
-                  className="w-16 text-center"
-                  maxLength={2}
-                />
-                <span className="text-sm text-muted-foreground">Minutes</span>
+              <div className="flex flex-col items-center h-full">
+                <Button
+                  variant="default"
+                  onClick={updateCountdownTime}
+                  className="w-full sm:w-auto"
+                >
+                  Set Time
+                </Button>
+                <span className="text-sm text-muted-foreground mt-1">
+                  {`${hours}:${minutes}:${seconds}`}
+                </span>
               </div>
-              <span className="text-2xl">:</span>
-              <div className="flex flex-col items-center">
-                <Input
-                  type="text"
-                  value={seconds}
-                  onChange={(e) => handleTimeInput(e.target.value, setSeconds)}
-                  className="w-16 text-center"
-                  maxLength={2}
-                />
-                <span className="text-sm text-muted-foreground">Seconds</span>
-              </div>
-              <Button
-                variant="outline"
-                onClick={updateCountdownTime}
-                className="ml-2"
-              >
-                Set Time
-              </Button>
             </div>
           )}
           <div className="text-6xl font-mono tabular-nums">
@@ -218,6 +317,21 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
               {timerMode === "stopwatch" ? "Countdown" : "Stopwatch"}
             </Button>
           </div>
+          <div className="text-sm text-muted-foreground mt-1">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsAlarmOn(!isAlarmOn)}
+              className={`
+                ${
+                  isAlarmOn
+                    ? "animate-[blink_1s_ease-in-out_infinite]"
+                    : "hidden"
+                }`}
+            >
+              {isAlarmOn ? "Turn Alarm Off" : "Turn Alarm On"}
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -230,6 +344,7 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
           teamName={""}
           isAdmin={false}
           focusOnTask={taskData}
+          taskType={TaskType.ALL}
         />
       </div>
     </div>

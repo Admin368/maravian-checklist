@@ -388,9 +388,10 @@ export function TaskItem(props: TaskItemProps) {
             <div className="flex flex-col items-start flex-wrap">
               <span
                 className={cn(
-                  "text-sm break-all pr-1 w-full",
+                  "text-sm break-words pr-1 w-full",
                   isCompleted && "line-through text-muted-foreground"
                 )}
+                onClick={handleOnFocus}
               >
                 {task.title}
               </span>

@@ -6,6 +6,7 @@ import { serverGetTeamMembers } from "./users";
 import { toISODateTime } from "./check-ins";
 import { serverGetCheckInStatus } from "./check-ins";
 import { prisma } from "@/lib/prisma";
+import { TaskType } from "@/types/task";
 
 export const serverGetTasks = async (args: {
   teamId: string;
@@ -127,6 +128,7 @@ export const tasksRouter = router({
       z.object({
         teamId: z.string().uuid(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        taskType: z.nativeEnum(TaskType).default(TaskType.DAILY),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -150,7 +152,7 @@ export const tasksRouter = router({
         const tasks = await serverGetTasks({
           teamId: input.teamId,
           date: input.date,
-          type: "daily",
+          type: input.taskType === "all" ? undefined : input.taskType,
           userId: ctx.userId!,
         });
         const teamMembers = await serverGetTeamMembers({

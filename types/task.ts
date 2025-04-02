@@ -12,3 +12,9 @@ export interface Task {
   time?: string | null;
   assignments: { userId: string }[];
 }
+
+export enum TaskType {
+  DAILY = "daily",
+  CHECKLIST = "checklist",
+  ALL = "all",
+}

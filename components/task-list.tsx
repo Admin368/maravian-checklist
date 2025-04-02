@@ -23,6 +23,7 @@ import { Task } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { UserCircle } from "lucide-react";
+import { TaskType } from "@/types/task";
 
 interface TeamMember {
   id: string;
@@ -37,11 +38,13 @@ export function TaskList({
   teamName,
   isAdmin = false,
   focusOnTask,
+  taskType,
 }: {
   teamId: string;
   teamName: string;
   isAdmin?: boolean;
   focusOnTask?: Task;
+  taskType?: TaskType;
 }) {
   const { userId, userName } = useUser();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -65,7 +68,7 @@ export function TaskList({
     error: tasksError,
     refetch,
   } = api.tasks.getByTeam.useQuery(
-    { teamId, date: formattedDate },
+    { teamId, date: formattedDate, taskType },
     {
       enabled: !!userId,
       refetchInterval: 10000,

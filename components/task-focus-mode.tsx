@@ -137,7 +137,7 @@ export function TaskFocusMode({ taskId }: TaskFocusModeProps) {
 
     return () => {
       clearInterval(interval);
-      setIsAlarmOn(false);
+      // setIsAlarmOn(false);
     };
   }, [isRunning, timerMode]);
 

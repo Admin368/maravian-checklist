@@ -164,7 +164,6 @@ export function CloneTeamButton({
           variant="outline"
           className="w-full"
           onClick={() => {
-            console.log("Clone button clicked");
             setIsOpen(true);
           }}
         >
@@ -242,7 +241,6 @@ export function CloneTeamButton({
               type="button"
               variant="outline"
               onClick={() => {
-                console.log("Cancel button clicked");
                 setIsOpen(false);
               }}
               disabled={isSubmitting}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,9 @@ import {
   UserCircle,
   CalendarClock,
   Users,
+  Focus,
+  ArrowUpDown,
+  Clock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,7 +31,7 @@ import { api } from "@/lib/trpc/client";
 import { useUser } from "./user-provider";
 import { cn } from "@/lib/utils";
 import { TaskCompletionModal } from "./task-completion-modal";
-import { format } from "date-fns";
+import { format, isToday, isPast } from "date-fns";
 import { toast } from "sonner";
 import { TaskAssignmentDialog } from "./task-assignment-dialog";
 // import { TaskCompletion } from "@prisma/client";
@@ -37,7 +41,7 @@ import {
   serverGetTasksReturnType,
 } from "@/server/api/routers/tasks";
 // import { Task } from "@prisma/client";
-import { TaskCompletionTime } from "./task-completion-time";
+import { TaskItemInfo } from "./task-item-info";
 
 interface TaskItemProps {
   task: serverGetTasksReturnType;
@@ -58,31 +62,37 @@ interface TaskItemProps {
   hideNotAssignedToMe?: boolean;
   isCheckedIn: boolean;
   showReorderButtons?: boolean;
+  setShowReorderButtons?: (showReorderButtons: boolean) => void;
   showCompleted?: boolean;
+  focusOnTaskId?: string;
 }
 
-export function TaskItem({
-  task,
-  tasks,
-  completions,
-  teamMembers,
-  selectedDate,
-  level = 0,
-  onAddSubtask,
-  onEditTask,
-  onDeleteTask,
-  onMoveTask,
-  className,
-  refetch,
-  dragHandleProps,
-  isAdmin,
-  hideTools,
-  hideNotAssignedToMe,
-  isCheckedIn,
-  showReorderButtons = false,
-  showCompleted = false,
-}: TaskItemProps) {
+export function TaskItem(props: TaskItemProps) {
+  const {
+    task,
+    tasks,
+    completions,
+    teamMembers,
+    selectedDate,
+    level = 0,
+    onAddSubtask,
+    onEditTask,
+    onDeleteTask,
+    onMoveTask,
+    className,
+    refetch,
+    dragHandleProps,
+    isAdmin,
+    hideTools,
+    hideNotAssignedToMe,
+    isCheckedIn,
+    showReorderButtons = false,
+    setShowReorderButtons,
+    showCompleted = false,
+    focusOnTaskId,
+  } = props;
   const { userId } = useUser();
+  const router = useRouter();
   const [expanded, setExpanded] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [completedBy, setCompletedBy] = useState<string | null>(null);
@@ -315,6 +325,9 @@ export function TaskItem({
         });
     }
   };
+  const handleOnFocus = () => {
+    router.push(`/task/${task.id}`);
+  };
 
   return (
     <div
@@ -326,6 +339,7 @@ export function TaskItem({
       style={{
         marginLeft: level === 0 ? "0px" : "0px",
         marginRight: "0px",
+        borderColor: focusOnTaskId === task.id ? "red" : undefined,
       }}
       id={`task-${task.id}`}
     >
@@ -371,15 +385,44 @@ export function TaskItem({
 
           {/* Task title and badges */}
           <div className="flex-1 min-w-0 ml-1">
-            <div className="flex items-start flex-wrap">
+            <div className="flex flex-col items-start flex-wrap">
               <span
                 className={cn(
-                  "text-sm break-all pr-1 w-full",
+                  "text-sm break-words pr-1 w-full cursor-pointer hover:underline",
                   isCompleted && "line-through text-muted-foreground"
                 )}
+                onClick={handleOnFocus}
               >
                 {task.title}
               </span>
+              {task.deadline && (
+                <TaskItemInfo
+                  label="Deadline:"
+                  value={
+                    task.deadline
+                      ? format(new Date(task.deadline), "MMM d, yyyy")
+                      : ""
+                  }
+                  textColor={
+                    task.deadline
+                      ? isPast(new Date(task.deadline))
+                        ? "text-red-500"
+                        : isToday(new Date(task.deadline))
+                        ? "text-yellow-500"
+                        : "text-primary"
+                      : "text-muted-foreground"
+                  }
+                  icon={<CalendarClock className="h-3 w-3" />}
+                />
+              )}
+              {task.time && (
+                <TaskItemInfo
+                  label="Time"
+                  value={task.time}
+                  textColor="text-primary"
+                  icon={<Clock className="h-3 w-3" />}
+                />
+              )}
 
               {/* Add badge for checklist items when they appear in regular task lists */}
               {(task as any).type === "checklist" && selectedDate !== "*" && (
@@ -390,24 +433,22 @@ export function TaskItem({
             </div>
 
             {isCompleted && completerName && (
-              <div className="text-xs text-muted-foreground flex items-center mt-1 flex-wrap">
-                <UserCircle className="h-3 w-3 mr-1 flex-shrink-0" />
-                <span className="break-words">
-                  Completed by {completerName}{" "}
-                  {completedAt && format(completedAt, "h:mm a")}
-                </span>
-              </div>
+              <TaskItemInfo
+                label="Completed by"
+                value={`${completerName} ${
+                  completedAt && format(completedAt, "h:mm a")
+                }`}
+                icon={<UserCircle className="h-3 w-3" />}
+              />
             )}
 
             {/* Display assigned users */}
             {assignedUsers.length > 0 && (
-              <div className="text-xs text-muted-foreground flex items-center mt-1 flex-wrap">
-                <UserCircle className="h-3 w-3 mr-1 flex-shrink-0" />
-                <span className="break-words">
-                  Assigned to:{" "}
-                  {assignedUsers.map((user) => user?.name).join(", ")}
-                </span>
-              </div>
+              <TaskItemInfo
+                label="Assigned to:"
+                value={assignedUsers.map((user) => user?.name).join(", ")}
+                icon={<UserCircle className="h-3 w-3" />}
+              />
             )}
           </div>
         </div>
@@ -424,9 +465,7 @@ export function TaskItem({
           <div
             className={cn(
               "flex items-center gap-1",
-              !hideTools || showReorderButtons
-                ? "invisible group-hover:visible md:invisible md:group-hover:visible"
-                : "hidden"
+              !hideTools || showReorderButtons ? "opacity-100" : "hidden"
             )}
           >
             {/* Move buttons - only show when reordering is enabled */}
@@ -477,22 +516,35 @@ export function TaskItem({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => onEditTask?.(task)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={handleOnFocus}>
+                    <Focus className="mr-2 h-4 w-4" />
+                    Focus
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={copyTaskToClipboard}>
                     <Copy className="mr-2 h-4 w-4" />
                     Copy text
                   </DropdownMenuItem>
+                  {/* <DropdownMenuItem
+                    hidden={setShowReorderButtons ? true : false}
+                    onClick={() => setShowReorderButtons?.(!showReorderButtons)}
+                  >
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
+                    {showReorderButtons
+                      ? "Hide Reorder Buttons"
+                      : "Show Reorder Buttons"}
+                  </DropdownMenuItem> */}
                   {isAdmin && (
                     <DropdownMenuItem
                       onClick={() => setShowAssignmentDialog(true)}
                     >
                       <Users className="mr-2 h-4 w-4" />
                       Manage Assignments
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => onEditTask?.(task)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (
@@ -512,26 +564,7 @@ export function TaskItem({
       {expanded && visibleChildTasks.length > 0 && (
         <div className="flex flex-col space-y-2 w-full">
           {visibleChildTasks.map((childTask) => (
-            <TaskItem
-              key={childTask.id}
-              task={childTask}
-              tasks={tasks}
-              completions={completions}
-              teamMembers={teamMembers}
-              selectedDate={selectedDate}
-              level={level + 1}
-              onAddSubtask={onAddSubtask}
-              onEditTask={onEditTask}
-              onDeleteTask={onDeleteTask}
-              onMoveTask={onMoveTask}
-              refetch={refetch}
-              isAdmin={isAdmin}
-              hideTools={hideTools}
-              hideNotAssignedToMe={hideNotAssignedToMe}
-              isCheckedIn={isCheckedIn}
-              showReorderButtons={showReorderButtons}
-              showCompleted={showCompleted}
-            />
+            <TaskItem {...props} key={childTask.id} task={childTask} />
           ))}
         </div>
       )}

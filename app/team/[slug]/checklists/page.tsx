@@ -65,6 +65,7 @@ export default function ChecklistsPage() {
           <TabsTrigger value="longterm">LongTerm Tasks</TabsTrigger>
         </TabsList>
         <TabsContent value="longterm" className="mt-6">
+          <h2 className="text-2xl font-bold">LongTerm Tasks</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Long-term tasks represent ongoing responsibilities or one-time
             activities that persist over time. When completed, they remain

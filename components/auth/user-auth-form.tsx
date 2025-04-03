@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const formSchema = z.object({
@@ -34,6 +34,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [authError, setAuthError] = React.useState<string>("");
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const router = useRouter();
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
@@ -114,9 +115,18 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             )}
             Sign In
           </Button>
+          <Button
+            variant="outline"
+            disabled={isLoading}
+            onClick={() => {
+              router.push("/register");
+            }}
+          >
+            Create an Account
+          </Button>
         </div>
       </form>
-      <div className="relative my-4">
+      {/* <div className="relative my-4">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />
         </div>
@@ -138,7 +148,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
           <Icons.gitHub className="mr-2 h-4 w-4" />
         )}{" "}
         GitHub
-      </Button>
+      </Button> */}
     </div>
   );
 }

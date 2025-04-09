@@ -487,6 +487,27 @@ export function ChecklistComponent({
         />
       )}
 
+      {isAdmin && (
+        <Button
+          className="w-full"
+          onClick={() => {
+            const today = startOfDay(new Date());
+            if (showTodayOnly === true) {
+              setEditingTask({
+                deadline: today,
+              });
+            } else {
+              setEditingTask(null);
+            }
+            // setInitialData(null);
+            setShowTaskDialog(true);
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Add Item
+        </Button>
+      )}
+
       {showUserList && (
         <UserList
           teamId={teamId}

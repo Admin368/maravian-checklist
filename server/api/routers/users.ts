@@ -16,6 +16,33 @@ export const serverGetTeamMembers = async ({
   userId: string;
   checkIfMember?: boolean;
 }) => {
+  // Get the team with notification settings
+  const team = await ctx.prisma.team.findUnique({
+    where: { id: teamId },
+    select: {
+      id: true,
+      notificationOnInvitationUserIds: {
+        select: { id: true },
+      },
+      notificationOnAssignmentUserIds: {
+        select: { id: true },
+      },
+      notificationOnTaskCompletionUserIds: {
+        select: { id: true },
+      },
+      notificationOnCheckinUserIds: {
+        select: { id: true },
+      },
+      notificationOnNewTasksUserIds: {
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!team) {
+    throw new Error("Team not found");
+  }
+
   // Get all team members with user details and ban status
   const members = await ctx.prisma.teamMember.findMany({
     where: {
@@ -28,6 +55,12 @@ export const serverGetTeamMembers = async ({
           name: true,
           email: true,
           avatarUrl: true,
+          // Include global notification preferences
+          notificationOnInvitation: true,
+          notificationOnAssignment: true,
+          notificationOnTaskCompletion: true,
+          notificationOnCheckin: true,
+          notificationOnNewTasks: true,
         },
       },
     },
@@ -59,7 +92,18 @@ export const serverGetTeamMembers = async ({
     }
   }
 
-  // Transform the data to include role information and ban status
+  // Create helper functions to check notification preferences
+  const teamNotificationUserIds = {
+    invitation: new Set(team.notificationOnInvitationUserIds.map((u) => u.id)),
+    assignment: new Set(team.notificationOnAssignmentUserIds.map((u) => u.id)),
+    taskCompletion: new Set(
+      team.notificationOnTaskCompletionUserIds.map((u) => u.id)
+    ),
+    checkin: new Set(team.notificationOnCheckinUserIds.map((u) => u.id)),
+    newTasks: new Set(team.notificationOnNewTasksUserIds.map((u) => u.id)),
+  };
+
+  // Transform the data to include role information, ban status, and notification settings
   return members.map(
     (member: {
       user: {
@@ -67,16 +111,64 @@ export const serverGetTeamMembers = async ({
         name: string;
         email: string;
         avatarUrl: string | null;
+        notificationOnInvitation: boolean;
+        notificationOnAssignment: boolean;
+        notificationOnTaskCompletion: boolean;
+        notificationOnCheckin: boolean;
+        notificationOnNewTasks: boolean;
       };
       role: string | null;
-    }) => ({
-      id: member.user.id,
-      name: member.user.name,
-      email: member.user.email,
-      avatarUrl: member.user.avatarUrl,
-      role: member.role,
-      isBanned: bannedUserIds.has(member.user.id),
-    })
+    }) => {
+      const userId = member.user.id;
+
+      // Calculate effective notification settings (team-specific overrides global)
+      const notificationSettings = {
+        invitation:
+          teamNotificationUserIds.invitation.has(userId) ||
+          (!teamNotificationUserIds.invitation.has(userId) &&
+            member.user.notificationOnInvitation),
+        assignment:
+          teamNotificationUserIds.assignment.has(userId) ||
+          (!teamNotificationUserIds.assignment.has(userId) &&
+            member.user.notificationOnAssignment),
+        taskCompletion:
+          teamNotificationUserIds.taskCompletion.has(userId) ||
+          (!teamNotificationUserIds.taskCompletion.has(userId) &&
+            member.user.notificationOnTaskCompletion),
+        checkin:
+          teamNotificationUserIds.checkin.has(userId) ||
+          (!teamNotificationUserIds.checkin.has(userId) &&
+            member.user.notificationOnCheckin),
+        newTasks:
+          teamNotificationUserIds.newTasks.has(userId) ||
+          (!teamNotificationUserIds.newTasks.has(userId) &&
+            member.user.notificationOnNewTasks),
+      };
+
+      return {
+        id: member.user.id,
+        name: member.user.name,
+        email: member.user.email,
+        avatarUrl: member.user.avatarUrl,
+        role: member.role,
+        isBanned: bannedUserIds.has(member.user.id),
+        notificationSettings: {
+          notificationOnInvitation: notificationSettings.invitation,
+          notificationOnAssignment: notificationSettings.assignment,
+          notificationOnTaskCompletion: notificationSettings.taskCompletion,
+          notificationOnCheckin: notificationSettings.checkin,
+          notificationOnNewTasks: notificationSettings.newTasks,
+          // Also include which are team-specific vs global
+          hasTeamSpecificSettings: {
+            invitation: teamNotificationUserIds.invitation.has(userId),
+            assignment: teamNotificationUserIds.assignment.has(userId),
+            taskCompletion: teamNotificationUserIds.taskCompletion.has(userId),
+            checkin: teamNotificationUserIds.checkin.has(userId),
+            newTasks: teamNotificationUserIds.newTasks.has(userId),
+          },
+        },
+      };
+    }
   );
 };
 
@@ -367,6 +459,11 @@ export const usersRouter = router({
           name: true,
           email: true,
           avatarUrl: true,
+          notificationOnInvitation: true,
+          notificationOnAssignment: true,
+          notificationOnTaskCompletion: true,
+          notificationOnCheckin: true,
+          notificationOnNewTasks: true,
           // isBanned: true,
         },
       });

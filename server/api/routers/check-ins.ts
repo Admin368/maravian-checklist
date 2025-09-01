@@ -3,6 +3,7 @@ import { router, Context } from "@/lib/trpc/server";
 import { protectedProcedure } from "../middleware";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
+import { sendCheckinNotification } from "@/lib/notifications";
 
 export const serverGetCheckIns = async (args: {
   teamId: string;
@@ -319,7 +320,34 @@ export const checkInsRouter = router({
             checkInDate: date,
             notes: input.notes,
           },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         });
+
+        // Send check-in notification
+        try {
+          await sendCheckinNotification(
+            {
+              teamId: input.teamId,
+              actorUserId: ctx.userId!,
+              notificationType: "checkin",
+            },
+            {
+              checkinUserId: ctx.userId!,
+              checkinUserName: checkIn.user.name,
+              notes: input.notes,
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send check-in notification:", error);
+          // Don't fail the check-in if notification fails
+        }
 
         return {
           success: true,

@@ -1,8 +1,9 @@
 import { Metadata } from "next";
 import { AccountForm } from "@/components/account/account-form";
+import { NotificationSettings } from "@/components/account/notification-settings";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { UserCircle, LineChart, Lock } from "lucide-react";
+import { UserCircle, LineChart, Lock, Bell } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Account Settings",
@@ -47,6 +48,16 @@ export default function AccountPage() {
                 Security
               </Link>
             </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="#notifications">
+                <Bell className="h-4 w-4" />
+                Notifications
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -58,10 +69,13 @@ export default function AccountPage() {
             <div>
               <h1 className="text-3xl font-bold">Profile Settings</h1>
               <p className="text-muted-foreground">
-                Manage your profile information
+                Manage your profile information and notification preferences
               </p>
             </div>
             <AccountForm showPasswordFields={false} />
+            <div id="notifications">
+              <NotificationSettings />
+            </div>
           </div>
         </div>
       </div>

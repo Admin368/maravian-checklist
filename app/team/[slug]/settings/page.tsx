@@ -40,6 +40,9 @@ import { useSession } from "next-auth/react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
+import { TeamNotificationSettings } from "@/components/team-notification-settings";
+import { TeamDefaultNotificationSettings } from "@/components/team-default-notification-settings";
+import { TeamInvitations } from "@/components/team-invitations";
 
 export default function TeamSettingsPage() {
   const params = useParams();
@@ -334,6 +337,48 @@ export default function TeamSettingsPage() {
             </CardFooter>
           </form>
         </Card>
+
+        {teamData?.team && (
+          <>
+            {/* Individual User's Team Notification Preferences */}
+            <TeamNotificationSettings
+              teamId={teamData.team.id}
+              teamName={teamData.team.name}
+            />
+
+            {/* Admin-only sections */}
+            {teamData.teamMembers.find((member) => member.id === userId)
+              ?.role &&
+              ["admin", "owner"].includes(
+                teamData.teamMembers.find((member) => member.id === userId)
+                  ?.role || ""
+              ) && (
+                <>
+                  {/* Team Default Notification Settings */}
+                  <TeamDefaultNotificationSettings
+                    teamId={teamData.team.id}
+                    teamName={teamData.team.name}
+                    userRole={
+                      teamData.teamMembers.find(
+                        (member) => member.id === userId
+                      )?.role || ""
+                    }
+                  />
+
+                  {/* Team Invitations */}
+                  <TeamInvitations
+                    teamId={teamData.team.id}
+                    teamName={teamData.team.name}
+                    userRole={
+                      teamData.teamMembers.find(
+                        (member) => member.id === userId
+                      )?.role || ""
+                    }
+                  />
+                </>
+              )}
+          </>
+        )}
 
         <Card>
           <CardHeader>

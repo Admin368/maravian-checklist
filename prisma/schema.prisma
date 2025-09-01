@@ -16,10 +16,26 @@ model Team {
   isDeleted Boolean      @default(false) @map("is_deleted")
   isPrivate Boolean      @default(false) @map("is_private")
   isCloneable Boolean    @default(false) @map("is_cloneable")
+  
+  // Default notification settings for new team members (set by admin)
+  defaultNotificationOnInvitation Boolean @default(true) @map("default_notification_on_invitation")
+  defaultNotificationOnAssignment Boolean @default(true) @map("default_notification_on_assignment") 
+  defaultNotificationOnTaskCompletion Boolean @default(true) @map("default_notification_on_task_completion")
+  defaultNotificationOnCheckin Boolean @default(true) @map("default_notification_on_checkin")
+  defaultNotificationOnNewTasks Boolean @default(true) @map("default_notification_on_new_tasks")
+  
   checkIns  CheckIn[]
   tasks     Task[]
   members   TeamMember[]
   bans      TeamBan[]
+  invitations TeamInvitation[]
+  
+  // Individual user's team-specific notification settings (override defaults)
+  notificationOnInvitationUserIds User[] @relation("notificationOnInvitation")
+  notificationOnAssignmentUserIds User[] @relation("notificationOnAssignment")
+  notificationOnTaskCompletionUserIds User[] @relation("notificationOnTaskCompletion")
+  notificationOnCheckinUserIds User[] @relation("notificationOnCheckin")
+  notificationOnNewTasksUserIds User[] @relation("notificationOnNewTasks")
 
   @@index([slug], map: "idx_teams_slug")
   @@map("teams")
@@ -40,6 +56,19 @@ model User {
   teamMembers   TeamMember[]
   teamBans      TeamBan[]
   taskAssignments TaskAssignment[]
+  sentInvitations TeamInvitation[]
+    // Notification settings with defaults set to true
+  notificationOnInvitation    Boolean @default(true) @map("notification_on_invitation")
+  notificationOnAssignment    Boolean @default(true) @map("notification_on_assignment")
+  notificationOnTaskCompletion Boolean @default(true) @map("notification_on_task_completion")
+  notificationOnCheckin       Boolean @default(true) @map("notification_on_checkin")
+  notificationOnNewTasks      Boolean @default(true) @map("notification_on_new_tasks")
+  // Notification settings for specific teams
+  notificationOnInvitationTeamIds Team[] @relation("notificationOnInvitation")
+  notificationOnAssignmentTeamIds Team[] @relation("notificationOnAssignment")
+  notificationOnTaskCompletionTeamIds Team[] @relation("notificationOnTaskCompletion")
+  notificationOnCheckinTeamIds Team[] @relation("notificationOnCheckin")
+  notificationOnNewTasksTeamIds Team[] @relation("notificationOnNewTasks")
 
   @@map("users")
 }
@@ -79,6 +108,25 @@ model TeamMember {
 
   @@id([teamId, userId])
   @@map("team_members")
+}
+
+model TeamInvitation {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String    @db.VarChar(255)
+  teamId    String    @map("team_id") @db.Uuid
+  invitedBy String    @map("invited_by") @db.Uuid
+  token     String    @unique @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  inviter   User      @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@unique([email, teamId])
+  @@index([token])
+  @@index([email])
+  @@map("team_invitations")
 }
 
 model CheckIn {

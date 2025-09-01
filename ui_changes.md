@@ -1,0 +1,1 @@
+- also help slight fix on the task indentation so that its clear but also fully wide visible on mobile

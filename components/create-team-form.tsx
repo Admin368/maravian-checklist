@@ -14,10 +14,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/trpc/client";
-import { Loader2 } from "lucide-react";
+import {
+  Loader2,
+  Bell,
+  Mail,
+  UserPlus,
+  CheckSquare,
+  Calendar,
+  Plus,
+} from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { useSession } from "next-auth/react";
 import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 export function CreateTeamForm() {
   const router = useRouter();
@@ -27,6 +36,16 @@ export function CreateTeamForm() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [isCloneable, setIsCloneable] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Notification default settings for the team
+  const [notificationOnInvitation, setNotificationOnInvitation] =
+    useState(true);
+  const [notificationOnAssignment, setNotificationOnAssignment] =
+    useState(true);
+  const [notificationOnTaskCompletion, setNotificationOnTaskCompletion] =
+    useState(true);
+  const [notificationOnCheckin, setNotificationOnCheckin] = useState(true);
+  const [notificationOnNewTasks, setNotificationOnNewTasks] = useState(false);
 
   // Redirect to login if not authenticated
   if (!session) {
@@ -80,6 +99,11 @@ export function CreateTeamForm() {
         password,
         isPrivate,
         isCloneable,
+        notificationOnInvitation,
+        notificationOnAssignment,
+        notificationOnTaskCompletion,
+        notificationOnCheckin,
+        notificationOnNewTasks,
       });
     } catch (error) {
       // Error is handled in the mutation
@@ -147,6 +171,103 @@ export function CreateTeamForm() {
             <p className="text-xs text-muted-foreground">
               {`When enabled, members can clone this checklist to create their own version with all tasks intact.`}
             </p>
+          </div>
+
+          <Separator className="my-6" />
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-base font-medium flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Default Notification Settings
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Set the default notification preferences for team members.
+                Members can override these settings individually.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <UserPlus className="h-3 w-3" />
+                    Team Invitations
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Notify when members are invited
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationOnInvitation}
+                  onCheckedChange={setNotificationOnInvitation}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Mail className="h-3 w-3" />
+                    Task Assignments
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Notify when tasks are assigned
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationOnAssignment}
+                  onCheckedChange={setNotificationOnAssignment}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <CheckSquare className="h-3 w-3" />
+                    Task Completions
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Notify when tasks are completed
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationOnTaskCompletion}
+                  onCheckedChange={setNotificationOnTaskCompletion}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-3 w-3" />
+                    Team Check-ins
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Notify when members check in
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationOnCheckin}
+                  onCheckedChange={setNotificationOnCheckin}
+                />
+              </div>
+
+              <div className="flex items-center justify-between space-x-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Plus className="h-3 w-3" />
+                    New Tasks
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Notify when new tasks are created
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationOnNewTasks}
+                  onCheckedChange={setNotificationOnNewTasks}
+                />
+              </div>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-between">

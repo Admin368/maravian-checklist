@@ -79,7 +79,8 @@ export function TaskAssignmentDialog({
     if (value === "add") {
       setSelectedUsers([]);
     } else if (value === "remove") {
-      setSelectedUsers([...assignedUserIds]);
+      // setSelectedUsers([...assignedUserIds]);
+      setSelectedUsers([]);
     }
   };
 

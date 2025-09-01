@@ -7,6 +7,10 @@ import { toISODateTime } from "./check-ins";
 import { serverGetCheckInStatus } from "./check-ins";
 import { prisma } from "@/lib/prisma";
 import { TaskType } from "@/types/task";
+import {
+  sendTaskAssignmentNotification,
+  sendNewTaskNotification,
+} from "@/lib/notifications";
 
 export const serverGetTasks = async (args: {
   teamId: string;
@@ -291,6 +295,25 @@ export const tasksRouter = router({
           },
         });
 
+        // Send new task notification
+        try {
+          await sendNewTaskNotification(
+            {
+              teamId: input.teamId,
+              actorUserId: ctx.userId!,
+              notificationType: "new_tasks",
+            },
+            {
+              taskId: task.id,
+              taskTitle: task.title,
+              taskType: task.type,
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send new task notification:", error);
+          // Don't fail the task creation if notification fails
+        }
+
         return task;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
@@ -512,6 +535,25 @@ export const tasksRouter = router({
           },
           update: {},
         });
+
+        // Send task assignment notification
+        try {
+          await sendTaskAssignmentNotification(
+            {
+              teamId: teamId,
+              actorUserId: ctx.userId!,
+              notificationType: "assignment",
+            },
+            {
+              taskId: taskId,
+              taskTitle: task.title,
+              assignedToUserId: userId,
+            }
+          );
+        } catch (error) {
+          console.error("Failed to send task assignment notification:", error);
+          // Don't fail the assignment if notification fails
+        }
       }
 
       return { success: true };
@@ -590,6 +632,32 @@ export const tasksRouter = router({
               })),
               skipDuplicates: true,
             });
+
+            // Send notifications for new assignments (only to users not previously assigned)
+            try {
+              const newAssignments = userIds.filter(
+                (userId) => !currentAssignments.includes(userId)
+              );
+              for (const userId of newAssignments) {
+                await sendTaskAssignmentNotification(
+                  {
+                    teamId: teamId,
+                    actorUserId: ctx.userId!,
+                    notificationType: "assignment",
+                  },
+                  {
+                    taskId: taskId,
+                    taskTitle: task.title,
+                    assignedToUserId: userId,
+                  }
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Failed to send task assignment notifications:",
+                error
+              );
+            }
           }
         } else if (action === "add") {
           if (userIds.length > 0) {
@@ -600,6 +668,29 @@ export const tasksRouter = router({
               })),
               skipDuplicates: true,
             });
+
+            // Send notifications for new assignments
+            try {
+              for (const userId of userIds) {
+                await sendTaskAssignmentNotification(
+                  {
+                    teamId: teamId,
+                    actorUserId: ctx.userId!,
+                    notificationType: "assignment",
+                  },
+                  {
+                    taskId: taskId,
+                    taskTitle: task.title,
+                    assignedToUserId: userId,
+                  }
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Failed to send task assignment notifications:",
+                error
+              );
+            }
           }
         } else if (action === "remove") {
           if (userIds.length > 0) {

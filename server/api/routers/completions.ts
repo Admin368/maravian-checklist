@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { Context } from "@/lib/trpc/server";
 import { serverGetTeamMembers } from "./users";
 import { toISODateTime } from "./check-ins";
+import { sendTaskCompletionNotification } from "@/lib/notifications";
 
 // Define input schemas
 const getByDateSchema = z.object({
@@ -257,6 +258,28 @@ export const completionsRouter = router({
                 ...(completionDate ? { completionDate } : {}),
               },
             });
+
+            // Send task completion notification
+            try {
+              await sendTaskCompletionNotification(
+                {
+                  teamId: task.team!.id,
+                  actorUserId: ctx.userId!,
+                  notificationType: "task_completion",
+                },
+                {
+                  taskId: input.taskId,
+                  taskTitle: task.title,
+                  completedByUserId: ctx.userId!,
+                }
+              );
+            } catch (error) {
+              console.error(
+                "Failed to send task completion notification:",
+                error
+              );
+              // Don't fail the completion if notification fails
+            }
           }
         } else {
           // Remove completion

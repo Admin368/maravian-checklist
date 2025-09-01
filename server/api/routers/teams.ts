@@ -8,12 +8,21 @@ import type { Context } from "@/lib/trpc/server";
 import { TRPCError } from "@trpc/server";
 import { serverGetTeamMembers } from "./users";
 import { hashPassword, verifyPassword } from "@/lib/auth";
+import {
+  addUserToTeamNotifications,
+  addUserToTeamNotificationsWithSettings,
+} from "@/lib/notifications";
 
 type TeamInput = {
   name: string;
   password: string;
   isPrivate?: boolean;
   isCloneable?: boolean;
+  notificationOnInvitation?: boolean;
+  notificationOnAssignment?: boolean;
+  notificationOnTaskCompletion?: boolean;
+  notificationOnCheckin?: boolean;
+  notificationOnNewTasks?: boolean;
 };
 
 type JoinInput = {
@@ -213,6 +222,11 @@ export const teamsRouter = router({
         password: z.string().min(4),
         isPrivate: z.boolean().optional(),
         isCloneable: z.boolean().optional(),
+        notificationOnInvitation: z.boolean().optional(),
+        notificationOnAssignment: z.boolean().optional(),
+        notificationOnTaskCompletion: z.boolean().optional(),
+        notificationOnCheckin: z.boolean().optional(),
+        notificationOnNewTasks: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }: { ctx: Context; input: TeamInput }) => {
@@ -258,6 +272,21 @@ export const teamsRouter = router({
 
           return newTeam;
         });
+
+        // Add creator to team notification settings with custom preferences
+        try {
+          await addUserToTeamNotificationsWithSettings(userId, team.id, {
+            notificationOnInvitation: input.notificationOnInvitation ?? true,
+            notificationOnAssignment: input.notificationOnAssignment ?? true,
+            notificationOnTaskCompletion:
+              input.notificationOnTaskCompletion ?? true,
+            notificationOnCheckin: input.notificationOnCheckin ?? true,
+            notificationOnNewTasks: input.notificationOnNewTasks ?? true,
+          });
+        } catch (error) {
+          console.error("Failed to add creator to team notifications:", error);
+          // Don't fail team creation if notification setup fails
+        }
 
         return team;
       } catch (error) {
@@ -333,6 +362,14 @@ export const teamsRouter = router({
             role: "member",
           },
         });
+
+        // Add user to team notification settings based on their preferences
+        try {
+          await addUserToTeamNotifications(ctx.userId, input.teamId);
+        } catch (error) {
+          console.error("Failed to add user to team notifications:", error);
+          // Don't fail team join if notification setup fails
+        }
 
         return { success: true };
       } catch (error) {
@@ -829,6 +866,272 @@ export const teamsRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "An error occurred while cloning the team",
+        });
+      }
+    }),
+
+  // Invite user by email
+  inviteByEmail: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        email: z.string().email(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Check if user is admin/owner of the team
+        const teamMember = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+            role: { in: ["admin", "owner"] },
+          },
+          include: {
+            team: true,
+            user: true,
+          },
+        });
+
+        if (!teamMember) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to invite users to this team",
+          });
+        }
+
+        // Check if user is already a member
+        const existingMember = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: input.teamId,
+            user: { email: input.email },
+          },
+        });
+
+        if (existingMember) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "User is already a member of this team",
+          });
+        }
+
+        // Check if there's already a pending invitation
+        const existingInvitation = await ctx.prisma.teamInvitation.findFirst({
+          where: {
+            teamId: input.teamId,
+            email: input.email,
+            acceptedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        });
+
+        if (existingInvitation) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "There's already a pending invitation for this email",
+          });
+        }
+
+        // Generate invitation token
+        const crypto = await import("crypto");
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+        // Create invitation
+        const invitation = await ctx.prisma.teamInvitation.create({
+          data: {
+            email: input.email,
+            teamId: input.teamId,
+            invitedBy: ctx.userId,
+            token,
+            expiresAt,
+          },
+        });
+
+        // Send invitation email
+        const { EmailService } = await import("@/lib/email");
+        const { env } = await import("@/lib/env");
+
+        const inviteUrl = `${env.NEXT_PUBLIC_APP_URL}/invite/${token}`;
+
+        await EmailService.sendTeamInviteEmail(input.email, {
+          invitedUserName: input.email.split("@")[0], // Use email prefix as name
+          teamName: teamMember.team.name,
+          invitedByName: teamMember.user.name,
+          inviteUrl,
+        });
+
+        return {
+          message: "Invitation sent successfully",
+          invitation: {
+            id: invitation.id,
+            email: invitation.email,
+            expiresAt: invitation.expiresAt,
+          },
+        };
+      } catch (error) {
+        console.error("Error sending team invitation:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to send invitation",
+        });
+      }
+    }),
+
+  // Accept invitation
+  acceptInvitation: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Find the invitation
+        const invitation = await ctx.prisma.teamInvitation.findUnique({
+          where: { token: input.token },
+          include: { team: true },
+        });
+
+        if (
+          !invitation ||
+          invitation.acceptedAt ||
+          invitation.expiresAt < new Date()
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Invalid or expired invitation",
+          });
+        }
+
+        // Check if user's email matches invitation
+        const user = await ctx.prisma.user.findUnique({
+          where: { id: ctx.userId },
+        });
+
+        if (!user || user.email !== invitation.email) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "This invitation was not sent to your email address",
+          });
+        }
+
+        // Check if user is already a member
+        const existingMember = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: invitation.teamId,
+            userId: ctx.userId,
+          },
+        });
+
+        if (existingMember) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "You are already a member of this team",
+          });
+        }
+
+        // Accept invitation and add user to team
+        await ctx.prisma.$transaction(async (tx) => {
+          // Mark invitation as accepted
+          await tx.teamInvitation.update({
+            where: { id: invitation.id },
+            data: { acceptedAt: new Date() },
+          });
+
+          // Add user to team
+          await tx.teamMember.create({
+            data: {
+              teamId: invitation.teamId,
+              userId: ctx.userId,
+              role: "member",
+            },
+          });
+
+          // Apply team default notification settings to the new member
+          const team = await tx.team.findUnique({
+            where: { id: invitation.teamId },
+            select: {
+              defaultNotificationOnInvitation: true,
+              defaultNotificationOnAssignment: true,
+              defaultNotificationOnTaskCompletion: true,
+              defaultNotificationOnCheckin: true,
+              defaultNotificationOnNewTasks: true,
+            },
+          });
+
+          if (team) {
+            const { addUserToTeamNotificationsWithSettings } = await import(
+              "@/lib/notifications"
+            );
+            await addUserToTeamNotificationsWithSettings(
+              ctx.userId,
+              invitation.teamId,
+              {
+                notificationOnInvitation: team.defaultNotificationOnInvitation,
+                notificationOnAssignment: team.defaultNotificationOnAssignment,
+                notificationOnTaskCompletion:
+                  team.defaultNotificationOnTaskCompletion,
+                notificationOnCheckin: team.defaultNotificationOnCheckin,
+                notificationOnNewTasks: team.defaultNotificationOnNewTasks,
+              }
+            );
+          }
+        });
+
+        return {
+          message: "Successfully joined the team",
+          team: {
+            id: invitation.team.id,
+            name: invitation.team.name,
+            slug: invitation.team.slug,
+          },
+        };
+      } catch (error) {
+        console.error("Error accepting invitation:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to accept invitation",
+        });
+      }
+    }),
+
+  // Get team invitations (for admins)
+  getInvitations: protectedProcedure
+    .input(z.object({ teamId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        // Check if user is admin/owner of the team
+        const teamMember = await ctx.prisma.teamMember.findFirst({
+          where: {
+            teamId: input.teamId,
+            userId: ctx.userId,
+            role: { in: ["admin", "owner"] },
+          },
+        });
+
+        if (!teamMember) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to view team invitations",
+          });
+        }
+
+        const invitations = await ctx.prisma.teamInvitation.findMany({
+          where: { teamId: input.teamId },
+          include: {
+            inviter: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        return invitations;
+      } catch (error) {
+        console.error("Error fetching team invitations:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch invitations",
         });
       }
     }),

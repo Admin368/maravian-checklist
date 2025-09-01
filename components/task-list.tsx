@@ -532,6 +532,28 @@ export function TaskList({
           )}
         </div>
       )}
+      {isAdmin && visibleTasks.length > 0 && (
+        <div className="flex justify-center w-full py-2">
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              setEditingTask(null);
+              if (focusOnTask) {
+                setEditingTask({
+                  parentId: focusOnTask.id,
+                  title: "",
+                });
+              }
+              setShowTaskDialog(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Task
+          </Button>
+        </div>
+      )}
 
       {/* Task dialog */}
       {showTaskDialog && (
